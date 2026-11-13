@@ -4,6 +4,8 @@ import { datosInvalidos, noEncontrado } from '../../utils/errores.js';
 import { crearLector } from '../../utils/validacion.js';
 import { esNitValido, normalizarNit } from '../../utils/nit.js';
 import { exigirCajaDelDia } from '../caja/caja.servicio.js';
+import { crearEmisorInterno } from '../facturacion/emisor-interno.js';
+import { facturarVenta } from '../facturacion/facturacion.servicio.js';
 import {
   METODOS_MOSTRADOR, datosVenta, descontarAccesorios, leerItems, leerPago, obtenerCupon, prepararLineas,
   registrarIngresoCaja, totalesDe, venderMotos, ventaPublica,
@@ -27,7 +29,7 @@ function leerClienteNuevo(datos) {
   return cliente;
 }
 
-export function crearServicioPos({ datos, reloj = () => new Date() }) {
+export function crearServicioPos({ datos, reloj = () => new Date(), emisor = crearEmisorInterno() }) {
   const { repos } = datos;
 
   return {
@@ -76,6 +78,7 @@ export function crearServicioPos({ datos, reloj = () => new Date() }) {
         await venderMotos(r, venta, 'VENTA_POS', vendedorId);
         await descontarAccesorios(r, lineas, 'VENTA_POS', `Venta #${venta.id}`, vendedorId);
         await registrarIngresoCaja(r, caja, venta, pago.metodo, pago.referencia, vendedorId);
+        await facturarVenta(r, emisor, venta.id, reloj()); // RF 08: factura automática
         return ventaPublica(await r.ventas.buscarPorId(venta.id));
       });
     },

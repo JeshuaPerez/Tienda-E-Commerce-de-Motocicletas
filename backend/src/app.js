@@ -34,6 +34,11 @@ import { crearControladorVentas } from './modulos/ventas/ventas.controlador.js';
 import { crearRutasVentas } from './modulos/ventas/ventas.rutas.js';
 import { crearServicioPos } from './modulos/pos/pos.servicio.js';
 import { crearControladorPos, crearRutasPos } from './modulos/pos/pos.rutas.js';
+import { crearEmisorInterno } from './modulos/facturacion/emisor-interno.js';
+import { crearServicioFacturacion } from './modulos/facturacion/facturacion.servicio.js';
+import { crearControladorFacturacion, crearRutasFacturacion } from './modulos/facturacion/facturacion.rutas.js';
+import { crearServicioReportes } from './modulos/reportes/reportes.servicio.js';
+import { crearControladorReportes, crearRutasReportes } from './modulos/reportes/reportes.rutas.js';
 
 export function crearApp({ entorno = obtenerEntorno(), repositorioUsuarios, datos, almacen, reloj } = {}) {
   const repoUsuarios = repositorioUsuarios ?? crearRepositorioUsuarios(obtenerPrisma());
@@ -50,8 +55,12 @@ export function crearApp({ entorno = obtenerEntorno(), repositorioUsuarios, dato
   const servicioCompras = crearServicioCompras({ datos: datosNegocio });
   const servicioCupones = crearServicioCupones({ datos: datosNegocio });
   const servicioCaja = crearServicioCaja({ datos: datosNegocio, reloj });
-  const servicioVentas = crearServicioVentas({ datos: datosNegocio, almacen: almacenComprobantes, reloj });
-  const servicioPos = crearServicioPos({ datos: datosNegocio, reloj });
+  // PA-7: emisor de facturas internas; los datos del emisor vienen del entorno.
+  const emisor = crearEmisorInterno({ serie: entorno.FACTURA_SERIE, datosEmisor: entorno.EMISOR });
+  const servicioVentas = crearServicioVentas({ datos: datosNegocio, almacen: almacenComprobantes, reloj, emisor });
+  const servicioPos = crearServicioPos({ datos: datosNegocio, reloj, emisor });
+  const servicioFacturacion = crearServicioFacturacion({ datos: datosNegocio, reloj, emisor });
+  const servicioReportes = crearServicioReportes({ datos: datosNegocio, reloj });
 
   const app = express();
   app.disable('x-powered-by');
@@ -69,6 +78,8 @@ export function crearApp({ entorno = obtenerEntorno(), repositorioUsuarios, dato
   app.use('/api/caja', crearRutasCaja({ controlador: crearControladorCaja(servicioCaja), autenticar }));
   app.use('/api/pos', crearRutasPos({ controlador: crearControladorPos(servicioPos), autenticar }));
   app.use('/api', crearRutasVentas({ controlador: crearControladorVentas(servicioVentas), autenticar }));
+  app.use('/api', crearRutasFacturacion({ controlador: crearControladorFacturacion(servicioFacturacion), autenticar }));
+  app.use('/api/reportes', crearRutasReportes({ controlador: crearControladorReportes(servicioReportes), autenticar }));
 
   app.use(rutaNoEncontrada);
   app.use(manejarErrores);

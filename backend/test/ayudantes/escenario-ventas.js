@@ -7,6 +7,9 @@ import { crearServicioCupones } from '../../src/modulos/cupones/cupones.servicio
 import { crearServicioCaja } from '../../src/modulos/caja/caja.servicio.js';
 import { crearServicioVentas } from '../../src/modulos/ventas/ventas.servicio.js';
 import { crearServicioPos } from '../../src/modulos/pos/pos.servicio.js';
+import { crearEmisorInterno } from '../../src/modulos/facturacion/emisor-interno.js';
+import { crearServicioFacturacion } from '../../src/modulos/facturacion/facturacion.servicio.js';
+import { crearServicioReportes } from '../../src/modulos/reportes/reportes.servicio.js';
 
 export const ADMIN = { id: 1, rol: 'ADMINISTRADOR' };
 export const CLIENTE = { id: 2, rol: 'CLIENTE' };
@@ -40,13 +43,16 @@ export async function crearEscenario() {
   const almacen = crearAlmacenFalso();
 
   const catalogo = crearServicioCatalogo({ datos: base });
+  const emisor = crearEmisorInterno({ serie: 'A', datosEmisor: { nombre: 'MotoStore GT', nit: '1234567-8', direccion: 'Ciudad de Guatemala' } });
   const servicios = {
     catalogo,
     inventario: crearServicioInventario({ datos: base }),
     cupones: crearServicioCupones({ datos: base, reloj: ahora }),
     caja: crearServicioCaja({ datos: base, reloj: ahora }),
-    ventas: crearServicioVentas({ datos: base, almacen, reloj: ahora }),
-    pos: crearServicioPos({ datos: base, reloj: ahora }),
+    ventas: crearServicioVentas({ datos: base, almacen, reloj: ahora, emisor }),
+    pos: crearServicioPos({ datos: base, reloj: ahora, emisor }),
+    facturacion: crearServicioFacturacion({ datos: base, reloj: ahora, emisor }),
+    reportes: crearServicioReportes({ datos: base, reloj: ahora }),
   };
 
   const marca = await catalogo.crearMarca({ nombre: 'Yamaha' });

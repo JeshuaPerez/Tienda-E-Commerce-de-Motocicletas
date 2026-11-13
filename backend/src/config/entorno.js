@@ -32,6 +32,10 @@ export function cargarEntorno(variables = process.env) {
     problemas.push('BCRYPT_COSTO debe ser un entero entre 4 y 15');
   }
 
+  if (variables.FACTURA_SERIE?.trim() && !/^[A-Z0-9]{1,10}$/.test(variables.FACTURA_SERIE.trim())) {
+    problemas.push('FACTURA_SERIE debe tener de 1 a 10 letras mayúsculas o números');
+  }
+
   if (problemas.length) throw new ErrorConfiguracion(problemas);
 
   return Object.freeze({
@@ -43,6 +47,13 @@ export function cargarEntorno(variables = process.env) {
     // PA-8: carpeta local de comprobantes (fuera de git). Por defecto, backend/uploads/comprobantes.
     DIRECTORIO_COMPROBANTES:
       variables.DIRECTORIO_COMPROBANTES?.trim() || fileURLToPath(new URL('../../uploads/comprobantes', import.meta.url)),
+    // PA-7: serie de la factura interna y datos del emisor que se imprimen en ella (opcionales).
+    FACTURA_SERIE: variables.FACTURA_SERIE?.trim() || 'A',
+    EMISOR: Object.freeze({
+      nombre: variables.EMISOR_NOMBRE?.trim() || 'MotoStore GT',
+      nit: variables.EMISOR_NIT?.trim() || null,
+      direccion: variables.EMISOR_DIRECCION?.trim() || null,
+    }),
   });
 }
 
