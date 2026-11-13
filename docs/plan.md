@@ -15,9 +15,9 @@ Las marcas **(PA-n)** señalan puntos abiertos del enunciado. Lo escrito junto a
 | RF 05 Caja | `caja` | `POST /api/caja/apertura` · `GET /api/caja/actual` · `POST /api/caja/retiros` · `POST /api/caja/cierre` · `GET /api/caja/sesiones` · `GET /api/caja/sesiones/:id` · `POST /api/ventas/:id/cobro` | SesionCaja, MovimientoCaja | Caja (panel) | `caja.test.js`, `fase3.bd.test.js`: una sola caja abierta, cuadre = inicial + ingresos − retiros, día de Guatemala |
 | RF 06 Inventario | `inventario` | `GET /api/inventario/resumen` · `GET /api/inventario/alertas` · `GET /api/inventario/motocicletas` · `GET /api/inventario/movimientos` · `POST /api/inventario/ajustes` | MovimientoInventario, Modelo.stockMinimo, Accesorio.stockMinimo | Inventario (panel) | `inventario.servicio.test.js`: alerta si disponibles ≤ mínimo (mínimo 0 = sin alerta), ajustes sin stock negativo |
 | RF 07 Proveedores y compras | `compras` | `GET/POST/PUT /api/proveedores` · `GET/POST /api/ordenes-compra` · `PATCH /api/ordenes-compra/:id/estado` · `POST /api/ordenes-compra/:id/recepciones` | Proveedor, OrdenCompra, OrdenCompraDetalle, Recepcion | Proveedores, Órdenes de compra (panel) | `compras.servicio.test.js`, `fase2.bd.test.js`: la recepción crea motos Disponibles y su ENTRADA, no supera lo pedido y es todo o nada |
-| RF 08 Facturación | `facturacion` | `POST /api/facturas` · `GET /api/facturas/:id` · `GET /api/mis-facturas` · `PATCH /api/facturas/:id/anular` | Factura, FacturaLinea | Mis compras/facturas (tienda) · Facturación (panel) | `facturacion.test.js`: NIT válido o "CF", correlativo único, una factura por venta |
+| RF 08 Facturación | `facturacion` | Emisión automática al quedar pagada la venta · `GET /api/facturas` · `GET /api/facturas/:id` · `GET /api/mis-facturas` · `POST /api/facturas` (reemisión) · `PATCH /api/facturas/:id/anular` | Factura, FacturaLinea, SerieFactura | Mis compras/facturas (tienda) · Facturación (panel) | `facturacion.test.js`, `fase4.http.test.js`, `fase4.bd.test.js`: NIT o CF, correlativo sin duplicados, una factura vigente por venta |
 | RF 09 Cupones | `cupones` | `GET/POST/PUT /api/cupones` (se aplican en `checkout/cotizar`, `checkout` y `pos/ventas`) | Cupon | Cupones (panel), campo en checkout y POS | `cupones-impuestos.test.js`, `pos.test.js`, `fase3.bd.test.js`: porcentaje, monto fijo, vigencia, límite de usos, canal (PA-12) |
-| RF 10 Reportes | `reportes` | `GET /api/reportes/ventas?desde&hasta` · `/mas-vendidas` · `/flujo-caja` · `/rendimiento` | Venta, MovimientoCaja, Motocicleta.costoAdquisicion | Reportes (panel) | `reportes.test.js`: sumas por período con datos conocidos |
+| RF 10 Reportes | `reportes` | `GET /api/reportes/ventas?desde&hasta&agrupar` · `/mas-vendidas` · `/flujo-caja` · `/rendimiento` | Venta, MovimientoCaja, SesionCaja, Motocicleta.costoAdquisicion | Reportes (panel) | `reportes.test.js`, `fase4.http.test.js`: sumas por período (día de Guatemala), margen bruto |
 | RN 1 VIN único | `catalogo`, `compras` | `POST /api/motocicletas`, recepciones | Motocicleta.vin `UNIQUE` | — | `catalogo.servicio.test.js`, `compras.servicio.test.js`, `fase2.bd.test.js`: VIN repetido → 409 |
 | RN 2 Solo se vende si está Disponible | `ventas`, `pos` | `POST /api/checkout`, `POST /api/pos/ventas` | Motocicleta.estado + `SELECT … FOR UPDATE` | — | `ventas-web.test.js`, `pos.test.js`, `fase3.bd.test.js`: reservada o vendida → 409; ventas simultáneas del mismo VIN → solo una pasa |
 | RN 3 Checkout exige sesión | `auth` | `POST /api/checkout` (solo rol CLIENTE) | — | Checkout redirige al login | `fase3.http.test.js`: sin token → 401, administrador → 403 |
@@ -49,8 +49,9 @@ Montos: `Decimal @db.Decimal(12,2)` en GTQ. Estados: `enum` de Prisma.
 | ComprobanteTransferencia (PA-8) | rutaArchivo, mime, tamano, estado, motivoRechazo, revisadoPor | N–1 Venta | índice `estado` |
 | SesionCaja | abiertaEn, montoInicial, cerradaEn, efectivoContado, vouchersContados, esperado, diferencia, estado | 1–N MovimientoCaja | una sola `ABIERTA` (índice único parcial en SQL) |
 | MovimientoCaja | tipo (`INGRESO`, `RETIRO`), medio (`EFECTIVO`, `VOUCHER`, `TRANSFERENCIA`), monto, concepto | → SesionCaja, → Venta?, → Usuario | índice `sesionCajaId` |
-| Factura (PA-7) | serie, correlativo, nit o "CF", nombre, direccion, subtotal, iva, total, estado | 1–1 Venta, 1–N FacturaLinea | `UNIQUE(serie, correlativo)` · `ventaId UNIQUE` · índice `nit` |
+| Factura (PA-7) | serie, numero, nit o "CF", nombre, direccion, subtotal, descuento, total, baseImponible, iva, estado (`EMITIDA`, `ANULADA`), motivoAnulacion | N–1 Venta, 1–N FacturaLinea | `UNIQUE(serie, numero)` · una sola `EMITIDA` por venta (índice único parcial) · índice `nit` |
 | FacturaLinea | descripcion, cantidad, precioUnitario, subtotal (copia al emitir) | N–1 Factura | — |
+| SerieFactura | serie, ultimoNumero (correlativo atómico) | — | PK `serie` |
 
 Decisiones:
 - Usuario (acceso) separado de Cliente (datos comerciales y fiscales), porque el POS vende a personas sin cuenta.
@@ -86,7 +87,11 @@ Decisiones:
 | PA-8 Comprobantes | Carpeta local `backend/uploads/comprobantes` (fuera de git), máximo 5 MB, JPG, PNG o PDF validados por su firma real. | 2026-11-13 |
 | PA-9 Tiempo real | Consistencia transaccional con bloqueo de fila (`SELECT … FOR UPDATE`), sin WebSockets. | 2026-11-13 |
 | PA-12 Cupones | Cada cupón indica su canal: WEB, POS o AMBOS. | 2026-11-13 |
+| PA-7 Facturación | Factura interna (no FEL) con NIT o CF, nombre, dirección, serie y correlativo propios. Se emite sola cuando la venta queda pagada. La emisión está aislada en `backend/src/modulos/facturacion/emisor-interno.js` para conectar un certificador FEL más adelante; no se integra la SAT. | 2026-11-13 |
+| RF 10 Rendimiento | Margen bruto = ingresos sin IVA − costo de adquisición de las motos vendidas, por período. No incluye gastos operativos. | 2026-11-13 |
 
 Otras decisiones de la fase 2: el VIN sigue ISO 3779 (17 caracteres, sin I, O ni Q) y no se puede editar; el estado VENDIDA solo lo asigna una venta; los ajustes manuales son solo de accesorios, porque las motos salen del inventario con una venta.
 
 Otras decisiones de la fase 3: la transferencia aprobada entra como ingreso a la caja del día, por eso aprobarla exige la caja abierta; la caja del día es el día calendario de Guatemala y una caja olvidada abierta de un día anterior solo sirve para cerrarla; cada venta tiene un solo método de pago; el POS reutiliza la ficha del cliente si su NIT ya existe.
+
+Otras decisiones de la fase 4: para corregir datos fiscales se anula la factura y se reemite con número nuevo (nunca se edita una emitida); los reportes cuentan solo ventas cobradas según su fecha de pago; los accesorios no guardan costo unitario, así que en el rendimiento cuentan solo como ingreso.
