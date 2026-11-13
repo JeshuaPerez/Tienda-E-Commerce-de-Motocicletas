@@ -21,6 +21,12 @@ export const panel = {
   modelos: (marcaId) => g('/modelos', { marcaId }),
   crearModelo: (datos) => post('/modelos', datos),
   actualizarModelo: (id, datos) => put(`/modelos/${id}`, datos),
+  subirImagenModelo(id, archivo) {
+    const formulario = new FormData();
+    formulario.append('imagen', archivo);
+    return api.pedir('PUT', `/modelos/${id}/imagen`, { formulario });
+  },
+  quitarImagenModelo: (id) => api.pedir('DELETE', `/modelos/${id}/imagen`),
   crearMoto: (datos) => post('/motocicletas', datos),
   actualizarMoto: (id, datos) => put(`/motocicletas/${id}`, datos),
   cambiarEstadoMoto: (id, estado) => patch(`/motocicletas/${id}/estado`, { estado }),

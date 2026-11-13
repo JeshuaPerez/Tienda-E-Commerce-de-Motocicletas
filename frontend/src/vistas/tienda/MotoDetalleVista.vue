@@ -31,7 +31,14 @@ const agregar = () =>
   <AvisoError :error="error" />
 
   <article v-if="moto" class="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
-    <div class="rounded-3xl bg-gradient-to-br from-zinc-900 to-zinc-700 p-8 text-white sm:p-10">
+    <div v-if="moto.modelo.imagenUrl" class="overflow-hidden rounded-3xl border border-zinc-200 bg-white">
+      <img :src="moto.modelo.imagenUrl" :alt="`${titulo} ${moto.anio}`" class="aspect-[4/3] w-full bg-zinc-100 object-contain p-4" />
+      <div class="px-6 py-5">
+        <p class="text-sm font-semibold tracking-widest text-acento-700 uppercase">{{ moto.modelo.marca.nombre }}</p>
+        <h1 class="mt-1 text-3xl font-black sm:text-4xl">{{ moto.modelo.nombre }} <span class="text-zinc-400">· {{ moto.modelo.cilindrada }} cc</span></h1>
+      </div>
+    </div>
+    <div v-else class="rounded-3xl bg-gradient-to-br from-zinc-900 to-zinc-700 p-8 text-white sm:p-10">
       <p class="text-sm font-semibold tracking-widest text-acento-100 uppercase">{{ moto.modelo.marca.nombre }}</p>
       <h1 class="mt-1 text-4xl font-black sm:text-5xl">{{ moto.modelo.nombre }}</h1>
       <p class="mt-10 text-6xl font-black text-white/15 sm:text-7xl">{{ moto.modelo.cilindrada }} cc</p>

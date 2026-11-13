@@ -15,12 +15,19 @@ const agregar = () =>
 
 <template>
   <article class="tarjeta flex flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md">
-    <RouterLink :to="{ name: 'moto', params: { id: moto.id } }" class="relative block bg-gradient-to-br from-zinc-900 to-zinc-700 px-5 py-6 text-white">
+    <!-- Con imagen del modelo: la foto con el nombre encima. Sin imagen: la cabecera oscura de siempre. -->
+    <RouterLink v-if="moto.modelo.imagenUrl" :to="{ name: 'moto', params: { id: moto.id } }" class="relative block bg-zinc-100">
+      <img :src="moto.modelo.imagenUrl" :alt="`${titulo} ${moto.anio}`" loading="lazy" class="aspect-[4/3] w-full object-contain p-3" />
+      <span class="absolute top-3 left-3 rounded-md bg-white/90 px-2 py-1 text-xs font-semibold tracking-wide text-zinc-800 uppercase shadow-xs">{{ moto.modelo.marca.nombre }}</span>
+      <span class="absolute top-3 right-3 rounded-full bg-zinc-900/80 px-2 py-0.5 text-xs text-white">{{ moto.anio }}</span>
+    </RouterLink>
+    <RouterLink v-else :to="{ name: 'moto', params: { id: moto.id } }" class="relative block bg-gradient-to-br from-zinc-900 to-zinc-700 px-5 py-6 text-white">
       <p class="text-xs font-semibold tracking-widest text-acento-100 uppercase">{{ moto.modelo.marca.nombre }}</p>
       <p class="mt-1 text-2xl font-extrabold">{{ moto.modelo.nombre }}</p>
       <p class="mt-4 text-4xl font-black text-white/15">{{ moto.modelo.cilindrada }} cc</p>
       <span class="absolute top-4 right-4 rounded-full bg-white/10 px-2 py-0.5 text-xs">{{ moto.anio }}</span>
     </RouterLink>
+    <p v-if="moto.modelo.imagenUrl" class="px-5 pt-4 text-xl font-extrabold">{{ moto.modelo.nombre }}</p>
     <div class="flex flex-1 flex-col gap-3 p-5">
       <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
         <dt class="text-zinc-500">Color</dt><dd class="text-right font-medium">{{ moto.color }}</dd>

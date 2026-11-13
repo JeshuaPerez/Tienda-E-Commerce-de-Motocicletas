@@ -16,6 +16,7 @@ Plataforma web de comercio electrónico y gestión operativa para un concesionar
 - Caja diaria: apertura, ingresos por medio, retiros y cierre con cuadre de efectivo y vouchers.
 - Inventario por VIN, alertas de stock bajo, ajustes y bitácora de entradas y salidas.
 - Proveedores locales e internacionales, órdenes de compra en GTQ y recepción de mercancía por VIN.
+- Imagen por modelo (JPG, PNG o WebP) que se muestra en el catálogo.
 - Validación de transferencias, cupones, facturas (anulación y reemisión) y reportes (ventas por período, más vendidas, flujo de caja y margen bruto).
 
 ## Tecnología
@@ -131,6 +132,7 @@ npm run preview
 | `BCRYPT_COSTO` | No | Costo de bcrypt entre 4 y 15 (12 por defecto) |
 | `ADMIN_CORREO`, `ADMIN_NOMBRE`, `ADMIN_CONTRASENA` | Para el seed | Primer administrador; la contraseña debe tener entre 8 y 72 caracteres |
 | `DIRECTORIO_COMPROBANTES` | No | Carpeta de comprobantes de transferencia (por defecto `backend/uploads/comprobantes`, fuera de git) |
+| `DIRECTORIO_IMAGENES` | No | Carpeta de las imágenes de los modelos (por defecto `backend/uploads/imagenes`, fuera de git) |
 | `FACTURA_SERIE` | No | Serie de la factura interna (`A` por defecto) |
 | `EMISOR_NOMBRE`, `EMISOR_NIT`, `EMISOR_DIRECCION` | No | Datos del concesionario que se imprimen en cada factura |
 

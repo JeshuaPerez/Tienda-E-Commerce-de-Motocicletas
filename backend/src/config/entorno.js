@@ -47,6 +47,8 @@ export function cargarEntorno(variables = process.env) {
     // PA-8: carpeta local de comprobantes (fuera de git). Por defecto, backend/uploads/comprobantes.
     DIRECTORIO_COMPROBANTES:
       variables.DIRECTORIO_COMPROBANTES?.trim() || fileURLToPath(new URL('../../uploads/comprobantes', import.meta.url)),
+    DIRECTORIO_IMAGENES:
+      variables.DIRECTORIO_IMAGENES?.trim() || fileURLToPath(new URL('../../uploads/imagenes', import.meta.url)),
     // PA-7: serie de la factura interna y datos del emisor que se imprimen en ella (opcionales).
     FACTURA_SERIE: variables.FACTURA_SERIE?.trim() || 'A',
     EMISOR: Object.freeze({
