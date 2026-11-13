@@ -11,6 +11,7 @@ export function crearBaseFalsa() {
   let tablas = {
     marcas: [], modelos: [], motocicletas: [], accesorios: [], movimientos: [],
     proveedores: [], ordenes: [], detalles: [], recepciones: [],
+    clientes: [], cupones: [], ventas: [], ventasDetalle: [], comprobantes: [], cajas: [], movimientosCaja: [],
   };
   const contadores = {};
   const nuevoId = (tabla) => (contadores[tabla] = (contadores[tabla] ?? 0) + 1);
@@ -45,6 +46,21 @@ export function crearBaseFalsa() {
           modelo: modeloCompleto(porId('modelos', d.modeloId)),
           accesorio: porId('accesorios', d.accesorioId),
         })),
+    };
+
+  const ventaCompleta = (v) =>
+    v && {
+      ...v,
+      cliente: porId('clientes', v.clienteId),
+      cupon: v.cuponId ? porId('cupones', v.cuponId) : null,
+      detalles: tablas.ventasDetalle
+        .filter((d) => d.ventaId === v.id)
+        .map((d) => ({
+          ...d,
+          motocicleta: d.motocicletaId ? motoCompleta(porId('motocicletas', d.motocicletaId)) : null,
+          accesorio: d.accesorioId ? porId('accesorios', d.accesorioId) : null,
+        })),
+      comprobantes: tablas.comprobantes.filter((c) => c.ventaId === v.id).map((c) => ({ ...c })),
     };
 
   const repos = {
@@ -166,6 +182,102 @@ export function crearBaseFalsa() {
         return true;
       },
       crearRecepcion: async (datos) => insertar('recepciones', { fecha: new Date(), ...datos }),
+    },
+
+    clientes: {
+      buscarPorId: async (id) => porId('clientes', id),
+      buscarPorUsuarioId: async (usuarioId) => tablas.clientes.find((c) => c.usuarioId === usuarioId) ?? null,
+      buscar: async ({ nit, texto } = {}) =>
+        tablas.clientes.filter(
+          (c) => (!nit || c.nit === nit) && (!texto || c.nombre.toLowerCase().includes(texto.toLowerCase())),
+        ),
+      crear: async (datos) => insertar('clientes', { nit: null, direccion: null, telefono: null, usuarioId: null, ...datos }),
+    },
+
+    cupones: {
+      listar: async () => tablas.cupones.map((c) => ({ ...c })).reverse(),
+      buscarPorId: async (id) => porId('cupones', id),
+      buscarPorCodigo: async (codigo) => tablas.cupones.find((c) => c.codigo === codigo) ?? null,
+      crear: async (datos) => {
+        if (tablas.cupones.some((c) => c.codigo === datos.codigo)) throw conflicto('El código de cupón ya existe');
+        return insertar('cupones', { usosActuales: 0, activo: true, canal: 'AMBOS', usosMaximos: null, ...datos });
+      },
+      actualizar: async (id, datos) => actualizar('cupones', id, datos),
+      registrarUso: async (id) => {
+        const cupon = porId('cupones', id);
+        if (cupon.usosMaximos !== null && cupon.usosActuales >= cupon.usosMaximos) return false;
+        cupon.usosActuales += 1;
+        return true;
+      },
+      liberarUso: async (id) => {
+        const cupon = porId('cupones', id);
+        if (cupon.usosActuales > 0) cupon.usosActuales -= 1;
+      },
+    },
+
+    ventas: {
+      crear: async ({ detalles, ...datos }) => {
+        const venta = insertar('ventas', { descuento: '0', cuponId: null, vendedorId: null, sesionCajaId: null, ...datos });
+        for (const d of detalles) {
+          insertar('ventasDetalle', { ventaId: venta.id, motocicletaId: null, accesorioId: null, ...d });
+        }
+        return ventaCompleta(porId('ventas', venta.id));
+      },
+      buscarPorId: async (id) => ventaCompleta(porId('ventas', id)),
+      bloquear: async () => {},
+      actualizar: async (id, datos) => actualizar('ventas', id, datos),
+      listar: async ({ filtros = {}, saltar = 0, tomar = 20 } = {}) => {
+        const f = filtros;
+        const filas = tablas.ventas
+          .filter(
+            (v) =>
+              (!f.estado || v.estado === f.estado) &&
+              (!f.canal || v.canal === f.canal) &&
+              (!f.clienteId || v.clienteId === f.clienteId),
+          )
+          .map(ventaCompleta)
+          .reverse();
+        return paginar(filas, saltar, tomar);
+      },
+    },
+
+    comprobantes: {
+      crear: async (datos) => insertar('comprobantes', { estado: 'PENDIENTE', subidoEn: new Date(), ...datos }),
+      buscarPorId: async (id) => {
+        const c = porId('comprobantes', id);
+        return c && { ...c, venta: ventaCompleta(porId('ventas', c.ventaId)) };
+      },
+      actualizar: async (id, datos) => actualizar('comprobantes', id, datos),
+      listar: async ({ estado } = {}) =>
+        tablas.comprobantes
+          .filter((c) => !estado || c.estado === estado)
+          .map((c) => ({ ...c, venta: ventaCompleta(porId('ventas', c.ventaId)) }))
+          .reverse(),
+    },
+
+    caja: {
+      buscarAbierta: async () => tablas.cajas.find((c) => c.estado === 'ABIERTA') ?? null,
+      buscarPorId: async (id) => porId('cajas', id),
+      bloquear: async () => {},
+      crear: async (datos) => {
+        if (tablas.cajas.some((c) => c.estado === 'ABIERTA')) throw conflicto('Ya hay una caja abierta');
+        return insertar('cajas', { estado: 'ABIERTA', abiertaEn: new Date(), ...datos });
+      },
+      actualizar: async (id, datos) => actualizar('cajas', id, datos),
+      listar: async () => tablas.cajas.map((c) => ({ ...c })).reverse(),
+      registrarMovimiento: async (datos) => insertar('movimientosCaja', { fecha: new Date(), ventaId: null, referencia: null, ...datos }),
+      listarMovimientos: async (sesionCajaId) => tablas.movimientosCaja.filter((m) => m.sesionCajaId === sesionCajaId),
+      totalesPorMedio: async (sesionCajaId) => {
+        const totales = new Map();
+        for (const m of tablas.movimientosCaja.filter((x) => x.sesionCajaId === sesionCajaId)) {
+          const clave = `${m.tipo}|${m.medio}`;
+          totales.set(clave, D(totales.get(clave) ?? 0).plus(m.monto));
+        }
+        return [...totales].map(([clave, total]) => {
+          const [tipo, medio] = clave.split('|');
+          return { tipo, medio, total: total.toString() };
+        });
+      },
     },
   };
 

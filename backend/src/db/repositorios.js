@@ -140,8 +140,89 @@ export function crearRepositorios(db) {
       },
       crearRecepcion: (datos) => db.recepcion.create({ data: datos }),
     },
+
+    // ───── Fase 3 ─────
+    clientes: {
+      buscarPorId: (id) => db.cliente.findUnique({ where: { id } }),
+      buscarPorUsuarioId: (usuarioId) => db.cliente.findUnique({ where: { usuarioId } }),
+      buscar: ({ nit, texto } = {}) =>
+        db.cliente.findMany({
+          where: { nit, ...(texto ? { nombre: { contains: texto, mode: 'insensitive' } } : {}) },
+          orderBy: { nombre: 'asc' },
+          take: 20,
+        }),
+      crear: (datos) => db.cliente.create({ data: datos }),
+    },
+
+    cupones: {
+      listar: () => db.cupon.findMany({ orderBy: { id: 'desc' } }),
+      buscarPorId: (id) => db.cupon.findUnique({ where: { id } }),
+      buscarPorCodigo: (codigo) => db.cupon.findUnique({ where: { codigo } }),
+      crear: (datos) => conUnico(() => db.cupon.create({ data: datos }), `El cupón ${datos.codigo} ya existe`),
+      actualizar: (id, datos) => db.cupon.update({ where: { id }, data: datos }),
+      // Consume un uso solo si no se alcanzó el límite (condición en la misma sentencia UPDATE).
+      async registrarUso(id) {
+        const filas = await db.$executeRaw`
+          UPDATE "cupones" SET "usos_actuales" = "usos_actuales" + 1
+          WHERE "id" = ${id} AND ("usos_maximos" IS NULL OR "usos_actuales" < "usos_maximos")`;
+        return filas === 1;
+      },
+      liberarUso: (id) =>
+        db.cupon.updateMany({ where: { id, usosActuales: { gt: 0 } }, data: { usosActuales: { decrement: 1 } } }),
+    },
+
+    ventas: {
+      crear: ({ detalles, ...datos }) => db.venta.create({ data: { ...datos, detalles: { create: detalles } } }),
+      buscarPorId: (id) => db.venta.findUnique({ where: { id }, include: ventaCompleta }),
+      bloquear: (id) => db.$queryRaw`SELECT id FROM "ventas" WHERE id = ${id} FOR UPDATE`,
+      actualizar: (id, datos) => db.venta.update({ where: { id }, data: datos }),
+      async listar({ filtros = {}, saltar = 0, tomar = 20 } = {}) {
+        const where = { estado: filtros.estado, canal: filtros.canal, clienteId: filtros.clienteId };
+        const [items, total] = await Promise.all([
+          db.venta.findMany({ where, include: ventaCompleta, orderBy: { id: 'desc' }, skip: saltar, take: tomar }),
+          db.venta.count({ where }),
+        ]);
+        return { items, total };
+      },
+    },
+
+    comprobantes: {
+      crear: (datos) => db.comprobanteTransferencia.create({ data: datos }),
+      buscarPorId: (id) => db.comprobanteTransferencia.findUnique({ where: { id }, include: { venta: { include: ventaCompleta } } }),
+      actualizar: (id, datos) => db.comprobanteTransferencia.update({ where: { id }, data: datos }),
+      listar: ({ estado } = {}) =>
+        db.comprobanteTransferencia.findMany({
+          where: { estado },
+          include: { venta: { include: ventaCompleta } },
+          orderBy: { id: 'desc' },
+          take: 100,
+        }),
+    },
+
+    caja: {
+      buscarAbierta: () => db.sesionCaja.findFirst({ where: { estado: 'ABIERTA' } }),
+      buscarPorId: (id) => db.sesionCaja.findUnique({ where: { id } }),
+      bloquear: (id) => db.$queryRaw`SELECT id FROM "sesiones_caja" WHERE id = ${id} FOR UPDATE`,
+      // El índice único parcial impide dos cajas abiertas aunque dos aperturas lleguen a la vez.
+      crear: (datos) => conUnico(() => db.sesionCaja.create({ data: datos }), 'Ya hay una caja abierta'),
+      actualizar: (id, datos) => db.sesionCaja.update({ where: { id }, data: datos }),
+      listar: () => db.sesionCaja.findMany({ orderBy: { id: 'desc' }, take: 60 }),
+      registrarMovimiento: (datos) => db.movimientoCaja.create({ data: datos }),
+      listarMovimientos: (sesionCajaId) => db.movimientoCaja.findMany({ where: { sesionCajaId }, orderBy: { id: 'asc' } }),
+      async totalesPorMedio(sesionCajaId) {
+        const grupos = await db.movimientoCaja.groupBy({ by: ['tipo', 'medio'], where: { sesionCajaId }, _sum: { monto: true } });
+        return grupos.map((g) => ({ tipo: g.tipo, medio: g.medio, total: (g._sum.monto ?? 0).toString() }));
+      },
+    },
   };
 }
+
+const ventaCompleta = {
+  cliente: true,
+  cupon: true,
+  detalles: { orderBy: { id: 'asc' } },
+  comprobantes: { orderBy: { id: 'asc' } },
+};
 
 // "datos" que reciben los servicios: repositorios de lectura y ejecutar(fn) para trabajar en una transacción.
 export function crearDatos(prisma) {
