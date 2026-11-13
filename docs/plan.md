@@ -102,3 +102,17 @@ Otras decisiones de la fase 5: SPA con Vue 3, Vite y Tailwind sin librería de e
 Decisiones de la fase 6: el panel vive en /panel con su propio layout y todas sus rutas exigen el rol ADMINISTRADOR; un administrador que inicia sesión entra directo al tablero; el panel usa la misma identidad visual que la tienda; los reportes dibujan barras con CSS, sin librerías de gráficas; para corregir datos fiscales el panel anula y reemite en un solo paso; el comprobante de transferencia se muestra dentro del panel (imagen o PDF) con el tipo real que envía la API.
 
 Pantallas del panel (5.2) y su RF: Tablero (RF 05, RF 06, RN 4) · Punto de venta (RF 04, RN 2, RN 5, PA-2, PA-5, PA-12) · Caja (RF 05) · Ventas y detalle (RF 03, RN 4) · Transferencias (RN 4, PA-8) · Cupones (RF 09) · Facturación (RF 08) · Inventario (RF 06) · Motocicletas (RF 02, RN 1) · Marcas, modelos y accesorios (RF 02, PA-1) · Compras y recepción (RF 07, RN 1, PA-11) · Proveedores (RF 07) · Reportes (RF 10) · Administradores (RF 01, PA-3).
+
+## 5. Ampliación fuera del enunciado: imagen por modelo
+
+El enunciado no pide fotos. El usuario las pidió después del cierre (2026-11-13) y decidió:
+
+| Decisión | Detalle |
+|---|---|
+| Origen | El administrador sube el archivo desde el panel (no URL externas) |
+| Nivel | Una imagen por modelo; todas sus unidades la muestran |
+| Formato | JPG, PNG o WebP, validados por su firma real, hasta 2 MB; no se aceptan SVG subidos porque pueden llevar scripts |
+| Almacenamiento | backend/uploads/imagenes (fuera de git), nombres UUID generados por el servidor |
+| Datos de demostración | Ilustraciones SVG propias generadas por el servidor, sin fotos de terceros |
+
+Endpoints: PUT /api/modelos/:id/imagen y DELETE /api/modelos/:id/imagen (administrador), GET /api/imagenes/:nombre (público, con nosniff y una política CSP que impide ejecutar scripts). Pruebas: imagenes.test.js e imagenes.http.test.js. Pantallas: Panel > Marcas, modelos y accesorios; tarjeta y detalle de la moto en la tienda.
