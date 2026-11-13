@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { cantidadEnCarrito } from '../estado/carrito.js';
-import { cerrarSesion, esCliente, haySesion, sesion } from '../estado/sesion.js';
+import { cerrarSesion, esAdministrador, esCliente, haySesion, sesion } from '../estado/sesion.js';
 
 const router = useRouter();
 const menuAbierto = ref(false);
@@ -25,6 +25,7 @@ function salir() {
       <nav class="flex items-center gap-1 sm:gap-2" aria-label="Principal">
         <RouterLink to="/" class="boton-texto hidden sm:inline-flex">Catálogo</RouterLink>
         <RouterLink v-if="esCliente" to="/mis-compras" class="boton-texto hidden sm:inline-flex">Mis compras</RouterLink>
+        <RouterLink v-if="esAdministrador" to="/panel" class="boton-texto hidden sm:inline-flex">Panel</RouterLink>
 
         <RouterLink to="/carrito" class="boton-secundario relative" aria-label="Carrito de compras">
           <svg aria-hidden="true" viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2">
@@ -51,6 +52,7 @@ function salir() {
     <nav v-if="menuAbierto" class="border-t border-zinc-200 px-4 py-2 sm:hidden" aria-label="Menú móvil">
       <RouterLink to="/" class="block py-2" @click="menuAbierto = false">Catálogo</RouterLink>
       <RouterLink v-if="esCliente" to="/mis-compras" class="block py-2" @click="menuAbierto = false">Mis compras</RouterLink>
+      <RouterLink v-if="esAdministrador" to="/panel" class="block py-2" @click="menuAbierto = false">Panel</RouterLink>
       <button v-if="haySesion" type="button" class="block py-2 text-left" @click="salir">Salir</button>
       <RouterLink v-else to="/ingresar" class="block py-2 font-semibold text-acento-700" @click="menuAbierto = false">Ingresar</RouterLink>
     </nav>
