@@ -184,6 +184,46 @@ export function crearRepositorios(db) {
         ]);
         return { items, total };
       },
+      // RF 10: ventas cobradas cuyo pago cae en el rango, con lo necesario para los reportes.
+      listarCobradas: ({ desde, hasta }) =>
+        db.venta.findMany({
+          where: { estado: { in: ['PAGADA', 'ENTREGADA'] }, pagadaEn: { gte: desde, lte: hasta } },
+          include: { detalles: { include: { motocicleta: { include: { modelo: { include: { marca: true } } } }, accesorio: true } } },
+          orderBy: { pagadaEn: 'asc' },
+        }),
+    },
+
+    facturas: {
+      // Correlativo atómico por serie: crea la serie si no existe y devuelve el número ya incrementado.
+      async siguienteNumero(serie) {
+        const [fila] = await db.$queryRaw`
+          INSERT INTO "series_factura" ("serie", "ultimo_numero") VALUES (${serie}, 1)
+          ON CONFLICT ("serie") DO UPDATE SET "ultimo_numero" = "series_factura"."ultimo_numero" + 1
+          RETURNING "ultimo_numero"`;
+        return fila.ultimo_numero;
+      },
+      crear: ({ lineas, ...datos }) =>
+        conUnico(
+          () => db.factura.create({ data: { ...datos, lineas: { create: lineas } }, include: facturaCompleta }),
+          'La venta ya tiene una factura vigente',
+        ),
+      buscarPorId: (id) => db.factura.findUnique({ where: { id }, include: facturaCompleta }),
+      bloquear: (id) => db.$queryRaw`SELECT id FROM "facturas" WHERE id = ${id} FOR UPDATE`,
+      actualizar: (id, datos) => db.factura.update({ where: { id }, data: datos }),
+      async listar({ filtros = {}, saltar = 0, tomar = 20 } = {}) {
+        const f = filtros;
+        const where = {
+          nit: f.nit,
+          estado: f.estado,
+          emitidaEn: rango(f.desde, f.hasta),
+          ...(f.clienteId ? { venta: { clienteId: f.clienteId } } : {}),
+        };
+        const [items, total] = await Promise.all([
+          db.factura.findMany({ where, include: facturaCompleta, orderBy: { id: 'desc' }, skip: saltar, take: tomar }),
+          db.factura.count({ where }),
+        ]);
+        return { items, total };
+      },
     },
 
     comprobantes: {
@@ -209,6 +249,13 @@ export function crearRepositorios(db) {
       listar: () => db.sesionCaja.findMany({ orderBy: { id: 'desc' }, take: 60 }),
       registrarMovimiento: (datos) => db.movimientoCaja.create({ data: datos }),
       listarMovimientos: (sesionCajaId) => db.movimientoCaja.findMany({ where: { sesionCajaId }, orderBy: { id: 'asc' } }),
+      // RF 10: sesiones cuyo día de operación (texto AAAA-MM-DD, se compara bien como texto) está en el rango.
+      listarSesionesEntre: (desde, hasta) =>
+        db.sesionCaja.findMany({
+          where: { fechaOperacion: { gte: desde, lte: hasta } },
+          include: { movimientos: true },
+          orderBy: { id: 'asc' },
+        }),
       async totalesPorMedio(sesionCajaId) {
         const grupos = await db.movimientoCaja.groupBy({ by: ['tipo', 'medio'], where: { sesionCajaId }, _sum: { monto: true } });
         return grupos.map((g) => ({ tipo: g.tipo, medio: g.medio, total: (g._sum.monto ?? 0).toString() }));
@@ -222,7 +269,10 @@ const ventaCompleta = {
   cupon: true,
   detalles: { orderBy: { id: 'asc' } },
   comprobantes: { orderBy: { id: 'asc' } },
+  facturas: { orderBy: { id: 'asc' } },
 };
+
+const facturaCompleta = { lineas: { orderBy: { id: 'asc' } }, venta: { include: { cliente: true } } };
 
 // "datos" que reciben los servicios: repositorios de lectura y ejecutar(fn) para trabajar en una transacción.
 export function crearDatos(prisma) {
