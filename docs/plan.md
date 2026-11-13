@@ -9,16 +9,16 @@ Las marcas **(PA-n)** señalan puntos abiertos del enunciado. Lo escrito junto a
 | RF / regla | Módulo | Endpoints principales | Entidades | Pantalla | Prueba (node:test) |
 |---|---|---|---|---|---|
 | RF 01 Autenticación | `auth` | `POST /api/auth/registro` (solo clientes, PA-3) · `POST /api/auth/login` · `GET /api/auth/perfil` · `POST /api/usuarios` (un admin crea admins) | Usuario | Registro, Login (tienda) · Usuarios (panel) | `auth.test.js`: correo duplicado rechazado, contraseña con bcrypt, JWT válido, rol incorrecto → 403 |
-| RF 02 Catálogo | `catalogo` | `GET/POST/PUT /api/marcas` · `/api/modelos` · `GET /api/motocicletas?marca&cilindradaMin&cilindradaMax&precioMin&precioMax` · `GET /api/motocicletas/:id` · `POST/PUT /api/motocicletas` · `PATCH /api/motocicletas/:id/estado` | Marca, Modelo, Motocicleta | Catálogo y detalle (tienda) · Motocicletas (panel) | `catalogo.test.js`: filtros, transiciones de estado válidas |
+| RF 02 Catálogo | `catalogo` | `GET/POST/PUT /api/marcas` · `/api/modelos` · `GET /api/motocicletas?marca&cilindradaMin&cilindradaMax&precioMin&precioMax` · `GET /api/motocicletas/:id` · `POST/PUT /api/motocicletas` · `PATCH /api/motocicletas/:id/estado` · `GET/POST/PUT /api/accesorios` (PA-1) | Marca, Modelo, Motocicleta, Accesorio | Catálogo y detalle (tienda) · Motocicletas y accesorios (panel) | `catalogo.servicio.test.js`, `fase2.http.test.js`: filtros, estados, accesorios |
 | RF 03 Carrito y checkout | `ventas` | `POST /api/checkout/cotizar` · `POST /api/checkout` · `POST /api/ventas/:id/comprobante` | Venta, VentaDetalle, ComprobanteTransferencia, Accesorio (PA-1) | Carrito, Checkout | `checkout.test.js`: totales con Decimal, IVA (PA-6), cupón aplicado |
 | RF 04 POS | `pos` | `POST /api/pos/ventas` | Venta (canal POS), VentaDetalle, Cliente | POS (panel) | `pos.test.js`: venta con cliente, vendedor (PA-2), moto y método de pago (PA-5) |
 | RF 05 Caja | `caja` | `POST /api/caja/apertura` · `POST /api/caja/cierre` · `GET /api/caja/actual` · `POST /api/caja/retiros` · `GET /api/caja/:id/cuadre` | SesionCaja, MovimientoCaja | Caja (panel) | `caja.test.js`: una sola caja abierta, cuadre = inicial + ingresos − retiros |
-| RF 06 Inventario | `inventario` | `GET /api/inventario/resumen` · `GET /api/inventario/alertas` · `GET /api/inventario/movimientos` · `POST /api/inventario/ajustes` | MovimientoInventario, Modelo.stockMinimo | Inventario (panel) | `inventario.test.js`: alerta si disponibles < mínimo, cada venta y recepción deja un movimiento |
-| RF 07 Proveedores y compras | `compras` | `CRUD /api/proveedores` · `POST /api/ordenes-compra` · `PATCH /api/ordenes-compra/:id/estado` · `POST /api/ordenes-compra/:id/recepciones` | Proveedor, OrdenCompra, OrdenCompraDetalle, Recepcion | Proveedores, Órdenes de compra (panel) | `compras.test.js`: la recepción crea motos Disponibles y su ENTRADA, no se recibe más de lo pedido |
+| RF 06 Inventario | `inventario` | `GET /api/inventario/resumen` · `GET /api/inventario/alertas` · `GET /api/inventario/motocicletas` · `GET /api/inventario/movimientos` · `POST /api/inventario/ajustes` | MovimientoInventario, Modelo.stockMinimo, Accesorio.stockMinimo | Inventario (panel) | `inventario.servicio.test.js`: alerta si disponibles ≤ mínimo (mínimo 0 = sin alerta), ajustes sin stock negativo |
+| RF 07 Proveedores y compras | `compras` | `GET/POST/PUT /api/proveedores` · `GET/POST /api/ordenes-compra` · `PATCH /api/ordenes-compra/:id/estado` · `POST /api/ordenes-compra/:id/recepciones` | Proveedor, OrdenCompra, OrdenCompraDetalle, Recepcion | Proveedores, Órdenes de compra (panel) | `compras.servicio.test.js`, `fase2.bd.test.js`: la recepción crea motos Disponibles y su ENTRADA, no supera lo pedido y es todo o nada |
 | RF 08 Facturación | `facturacion` | `POST /api/facturas` · `GET /api/facturas/:id` · `GET /api/mis-facturas` · `PATCH /api/facturas/:id/anular` | Factura, FacturaLinea | Mis compras/facturas (tienda) · Facturación (panel) | `facturacion.test.js`: NIT válido o "CF", correlativo único, una factura por venta |
 | RF 09 Cupones | `cupones` | `CRUD /api/cupones` · `POST /api/cupones/validar` | Cupon | Cupones (panel), campo en checkout | `cupones.test.js`: porcentaje, monto fijo, vencido, límite de usos, canal (PA-12) |
 | RF 10 Reportes | `reportes` | `GET /api/reportes/ventas?desde&hasta` · `/mas-vendidas` · `/flujo-caja` · `/rendimiento` | Venta, MovimientoCaja, Motocicleta.costoAdquisicion | Reportes (panel) | `reportes.test.js`: sumas por período con datos conocidos |
-| RN 1 VIN único | `catalogo`, `compras` | `POST /api/motocicletas`, recepciones | Motocicleta.vin `UNIQUE` | — | `rn1-vin-unico.test.js`: VIN repetido → 409 |
+| RN 1 VIN único | `catalogo`, `compras` | `POST /api/motocicletas`, recepciones | Motocicleta.vin `UNIQUE` | — | `catalogo.servicio.test.js`, `compras.servicio.test.js`, `fase2.bd.test.js`: VIN repetido → 409 |
 | RN 2 Solo se vende si está Disponible | `ventas`, `pos` | checkout, `POST /api/pos/ventas` | Motocicleta.estado + bloqueo de fila | — | `rn2-disponible.test.js`: reservada o vendida → 409; dos ventas simultáneas del mismo VIN → solo una pasa |
 | RN 3 Checkout exige sesión | `auth` | `POST /api/checkout` | — | Checkout redirige al login | `rn3-checkout-sesion.test.js`: sin token → 401 |
 | RN 4 Transferencia validada antes de despachar | `ventas` | `PATCH /api/comprobantes/:id/aprobar` · `/rechazar` · `PATCH /api/ventas/:id/entregar` | ComprobanteTransferencia | Validación de transferencias (panel) | `rn4-transferencia.test.js`: entregar sin aprobación → 409 |
@@ -71,3 +71,13 @@ Decisiones:
 | 5 | `feature/fase-5-frontend-tienda` | Catálogo con filtros, carrito, checkout, historial, facturas | PA-10 |
 | 6 | `feature/fase-6-frontend-panel` | Inventario, caja, POS, compras, cupones, transferencias, facturación, reportes | — |
 | 7 | `feature/fase-7-cierre` | Integración, README, verificación final, PR de `dev` a `main` | — |
+
+## 4. Puntos abiertos resueltos
+
+| Punto | Decisión | Fecha |
+|---|---|---|
+| PA-3 Registro de administradores | El registro público solo crea clientes. El primer administrador sale del seed (`ADMIN_*` en `.env`) y los demás los crea un administrador con `POST /api/usuarios`. | 2026-11-13 |
+| PA-1 Accesorios | Entidad aparte con SKU único, precio en GTQ, stock por cantidad y stock mínimo. Se compran a proveedores. | 2026-11-13 |
+| PA-11 Moneda de las compras | Todas las órdenes de compra se registran en GTQ, con el costo ya convertido. | 2026-11-13 |
+
+Otras decisiones de la fase 2: el VIN sigue ISO 3779 (17 caracteres, sin I, O ni Q) y no se puede editar; el estado VENDIDA solo lo asigna una venta; los ajustes manuales son solo de accesorios, porque las motos salen del inventario con una venta.
