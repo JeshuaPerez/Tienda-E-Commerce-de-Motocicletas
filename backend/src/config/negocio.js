@@ -23,3 +23,9 @@ export const COMPROBANTES = {
   tamanoMaximo: 5 * 1024 * 1024,
   tipos: ['image/jpeg', 'image/png', 'application/pdf'],
 };
+
+// Ampliación: imagen por modelo. No se aceptan SVG subidos (pueden llevar scripts).
+export const IMAGENES = {
+  tamanoMaximo: 2 * 1024 * 1024,
+  tipos: ['image/jpeg', 'image/png', 'image/webp'],
+};

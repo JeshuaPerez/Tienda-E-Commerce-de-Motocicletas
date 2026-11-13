@@ -3,6 +3,8 @@
 import { conflicto, datosInvalidos, noEncontrado } from '../../utils/errores.js';
 import { crearLector, leerPaginacion, sinIndefinidos } from '../../utils/validacion.js';
 import { normalizarVin } from '../../utils/vin.js';
+import { detectarTipoArchivo, TIPO_POR_EXTENSION } from '../../utils/archivos.js';
+import { IMAGENES } from '../../config/negocio.js';
 import { ESTADOS_MOTO, leerDatosUnidad, leerVin } from './catalogo.validacion.js';
 import { accesorioPublico, marcaPublica, modeloPublico, motoAdmin, motoPublica } from './catalogo.representacion.js';
 
@@ -30,8 +32,15 @@ function leerFiltrosMotos(consulta, { conEstado }) {
   return filtros;
 }
 
-export function crearServicioCatalogo({ datos }) {
+const NOMBRE_IMAGEN = /^[\w-]+\.(jpg|png|webp|svg)$/;
+
+export function crearServicioCatalogo({ datos, almacenImagenes = null }) {
   const { repos } = datos;
+
+  const exigirAlmacen = () => {
+    if (!almacenImagenes) throw new Error('El almacén de imágenes no está configurado');
+    return almacenImagenes;
+  };
 
   const buscarMoto = async (repositorio, id) => {
     const moto = await repositorio.motocicletas.buscarPorId(id);
@@ -112,6 +121,42 @@ export function crearServicioCatalogo({ datos }) {
       }
       await repos.modelos.actualizar(id, cambios);
       return modeloPublico(await repos.modelos.buscarPorId(id));
+    },
+
+    // ───── Imagen del modelo (ampliación) ─────
+    // Solo JPG, PNG o WebP por su firma real y hasta 2 MB. Al reemplazarla se borra el archivo anterior.
+    async subirImagenModelo(id, archivo) {
+      const tipo = detectarTipoArchivo(archivo?.contenido, IMAGENES.tipos);
+      if (!tipo) throw datosInvalidos(['imagen: solo se aceptan archivos JPG, PNG o WebP']);
+      if (archivo.contenido.length > IMAGENES.tamanoMaximo) throw datosInvalidos(['imagen: el archivo supera 2 MB']);
+      const modelo = await repos.modelos.buscarPorId(id);
+      if (!modelo) throw noEncontrado('Modelo no encontrado');
+
+      const almacen = exigirAlmacen();
+      const nombre = await almacen.guardar(archivo.contenido, tipo.extension);
+      try {
+        await repos.modelos.actualizar(id, { imagen: nombre });
+      } catch (error) {
+        await almacen.eliminar(nombre);
+        throw error;
+      }
+      if (modelo.imagen) await almacen.eliminar(modelo.imagen);
+      return modeloPublico(await repos.modelos.buscarPorId(id));
+    },
+
+    async quitarImagenModelo(id) {
+      const modelo = await repos.modelos.buscarPorId(id);
+      if (!modelo) throw noEncontrado('Modelo no encontrado');
+      await repos.modelos.actualizar(id, { imagen: null });
+      if (modelo.imagen) await exigirAlmacen().eliminar(modelo.imagen);
+      return modeloPublico(await repos.modelos.buscarPorId(id));
+    },
+
+    async leerImagen(nombre) {
+      if (typeof nombre !== 'string' || !NOMBRE_IMAGEN.test(nombre)) throw noEncontrado('Imagen no encontrada');
+      const contenido = await exigirAlmacen().leer(nombre);
+      if (!contenido) throw noEncontrado('Imagen no encontrada');
+      return { contenido, tipo: TIPO_POR_EXTENSION[nombre.split('.').pop()] };
     },
 
     // ───── Motocicletas ─────

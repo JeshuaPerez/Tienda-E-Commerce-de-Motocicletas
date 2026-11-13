@@ -105,6 +105,8 @@ model Modelo {
   nombre        String               @db.VarChar(100)
   cilindrada    Int
   stockMinimo   Int                  @default(0) @map("stock_minimo")
+  // Ampliación pedida por el usuario: archivo de la imagen del modelo (el nombre lo genera el servidor).
+  imagen        String?              @db.VarChar(100)
   creadoEn      DateTime             @default(now()) @map("creado_en")
   motocicletas  Motocicleta[]
   detallesOrden OrdenCompraDetalle[]
