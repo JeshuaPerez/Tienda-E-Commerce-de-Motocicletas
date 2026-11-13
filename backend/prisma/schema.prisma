@@ -15,15 +15,18 @@ enum Rol {
 
 // Cuenta de acceso (RF 01). El correo es único y está indexado.
 model Usuario {
-  id             Int      @id @default(autoincrement())
-  correo         String   @unique @db.VarChar(150)
-  hashContrasena String   @map("hash_contrasena") @db.VarChar(100)
-  nombre         String   @db.VarChar(120)
-  rol            Rol      @default(CLIENTE)
-  activo         Boolean  @default(true)
-  creadoEn       DateTime @default(now()) @map("creado_en")
-  actualizadoEn  DateTime @updatedAt @map("actualizado_en")
+  id             Int                    @id @default(autoincrement())
+  correo         String                 @unique @db.VarChar(150)
+  hashContrasena String                 @map("hash_contrasena") @db.VarChar(100)
+  nombre         String                 @db.VarChar(120)
+  rol            Rol                    @default(CLIENTE)
+  activo         Boolean                @default(true)
+  creadoEn       DateTime               @default(now()) @map("creado_en")
+  actualizadoEn  DateTime               @updatedAt @map("actualizado_en")
   cliente        Cliente?
+  movimientos    MovimientoInventario[]
+  ordenesCompra  OrdenCompra[]
+  recepciones    Recepcion[]
 
   @@map("usuarios")
 }
@@ -41,4 +44,194 @@ model Cliente {
 
   @@index([nit])
   @@map("clientes")
+}
+
+// ───────────── Fase 2: catálogo, inventario y compras (RF 02, RF 06, RF 07) ─────────────
+
+enum EstadoMotocicleta {
+  DISPONIBLE
+  RESERVADA
+  VENDIDA
+}
+
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+}
+
+enum MotivoMovimiento {
+  COMPRA
+  ALTA_MANUAL
+  AJUSTE
+}
+
+enum TipoProveedor {
+  LOCAL
+  INTERNACIONAL
+}
+
+enum EstadoOrdenCompra {
+  BORRADOR
+  ENVIADA
+  RECIBIDA_PARCIAL
+  RECIBIDA
+  CANCELADA
+}
+
+model Marca {
+  id       Int      @id @default(autoincrement())
+  nombre   String   @unique @db.VarChar(80)
+  creadoEn DateTime @default(now()) @map("creado_en")
+  modelos  Modelo[]
+
+  @@map("marcas")
+}
+
+// El stock mínimo es por modelo: la alerta compara las unidades DISPONIBLES contra este valor (RF 06).
+model Modelo {
+  id            Int                  @id @default(autoincrement())
+  marcaId       Int                  @map("marca_id")
+  marca         Marca                @relation(fields: [marcaId], references: [id], onDelete: Restrict)
+  nombre        String               @db.VarChar(100)
+  cilindrada    Int
+  stockMinimo   Int                  @default(0) @map("stock_minimo")
+  creadoEn      DateTime             @default(now()) @map("creado_en")
+  motocicletas  Motocicleta[]
+  detallesOrden OrdenCompraDetalle[]
+
+  @@unique([marcaId, nombre])
+  @@index([cilindrada])
+  @@map("modelos")
+}
+
+// Cada unidad física, identificada por su VIN único e irrepetible (regla de negocio 1).
+model Motocicleta {
+  id               Int                    @id @default(autoincrement())
+  vin              String                 @unique @db.VarChar(17)
+  modeloId         Int                    @map("modelo_id")
+  modelo           Modelo                 @relation(fields: [modeloId], references: [id], onDelete: Restrict)
+  anio             Int
+  color            String                 @db.VarChar(40)
+  precio           Decimal                @db.Decimal(12, 2)
+  costoAdquisicion Decimal?               @map("costo_adquisicion") @db.Decimal(12, 2)
+  descripcion      String?
+  fichaTecnica     Json?                  @map("ficha_tecnica")
+  estado           EstadoMotocicleta      @default(DISPONIBLE)
+  recepcionId      Int?                   @map("recepcion_id")
+  recepcion        Recepcion?             @relation(fields: [recepcionId], references: [id], onDelete: Restrict)
+  creadoEn         DateTime               @default(now()) @map("creado_en")
+  actualizadoEn    DateTime               @updatedAt @map("actualizado_en")
+  movimientos      MovimientoInventario[]
+
+  @@index([estado])
+  @@index([precio])
+  @@index([modeloId])
+  @@map("motocicletas")
+}
+
+// Accesorios (PA-1): sin VIN, con stock por cantidad.
+model Accesorio {
+  id            Int                    @id @default(autoincrement())
+  sku           String                 @unique @db.VarChar(40)
+  nombre        String                 @db.VarChar(120)
+  descripcion   String?
+  precio        Decimal                @db.Decimal(12, 2)
+  stock         Int                    @default(0)
+  stockMinimo   Int                    @default(0) @map("stock_minimo")
+  activo        Boolean                @default(true)
+  creadoEn      DateTime               @default(now()) @map("creado_en")
+  actualizadoEn DateTime               @updatedAt @map("actualizado_en")
+  movimientos   MovimientoInventario[]
+  detallesOrden OrdenCompraDetalle[]
+
+  @@map("accesorios")
+}
+
+// Bitácora de entradas y salidas (RF 06). Cada movimiento es de una moto o de un accesorio, nunca de ambos.
+model MovimientoInventario {
+  id            Int              @id @default(autoincrement())
+  tipo          TipoMovimiento
+  motivo        MotivoMovimiento
+  cantidad      Int
+  motocicletaId Int?             @map("motocicleta_id")
+  motocicleta   Motocicleta?     @relation(fields: [motocicletaId], references: [id], onDelete: Restrict)
+  accesorioId   Int?             @map("accesorio_id")
+  accesorio     Accesorio?       @relation(fields: [accesorioId], references: [id], onDelete: Restrict)
+  referencia    String?          @db.VarChar(200)
+  usuarioId     Int              @map("usuario_id")
+  usuario       Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  fecha         DateTime         @default(now())
+
+  @@index([fecha])
+  @@index([motocicletaId])
+  @@index([accesorioId])
+  @@map("movimientos_inventario")
+}
+
+model Proveedor {
+  id       Int           @id @default(autoincrement())
+  nombre   String        @db.VarChar(150)
+  tipo     TipoProveedor
+  nit      String?       @db.VarChar(20)
+  pais     String        @db.VarChar(60)
+  contacto String?       @db.VarChar(120)
+  telefono String?       @db.VarChar(30)
+  correo   String?       @db.VarChar(150)
+  activo   Boolean       @default(true)
+  creadoEn DateTime      @default(now()) @map("creado_en")
+  ordenes  OrdenCompra[]
+
+  @@index([nit])
+  @@map("proveedores")
+}
+
+// Órdenes de compra en GTQ (PA-11).
+model OrdenCompra {
+  id            Int                  @id @default(autoincrement())
+  proveedorId   Int                  @map("proveedor_id")
+  proveedor     Proveedor            @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  estado        EstadoOrdenCompra    @default(BORRADOR)
+  total         Decimal              @db.Decimal(12, 2)
+  notas         String?
+  usuarioId     Int                  @map("usuario_id")
+  usuario       Usuario              @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  creadaEn      DateTime             @default(now()) @map("creada_en")
+  actualizadaEn DateTime             @updatedAt @map("actualizada_en")
+  detalles      OrdenCompraDetalle[]
+  recepciones   Recepcion[]
+
+  @@index([estado])
+  @@map("ordenes_compra")
+}
+
+// Cada línea pide un modelo de moto o un accesorio, nunca ambos.
+model OrdenCompraDetalle {
+  id               Int         @id @default(autoincrement())
+  ordenCompraId    Int         @map("orden_compra_id")
+  ordenCompra      OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  modeloId         Int?        @map("modelo_id")
+  modelo           Modelo?     @relation(fields: [modeloId], references: [id], onDelete: Restrict)
+  accesorioId      Int?        @map("accesorio_id")
+  accesorio        Accesorio?  @relation(fields: [accesorioId], references: [id], onDelete: Restrict)
+  cantidad         Int
+  cantidadRecibida Int         @default(0) @map("cantidad_recibida")
+  costoUnitario    Decimal     @map("costo_unitario") @db.Decimal(12, 2)
+
+  @@index([ordenCompraId])
+  @@map("ordenes_compra_detalle")
+}
+
+// Recepción de mercancía: crea las motos con su VIN y suma el stock de accesorios.
+model Recepcion {
+  id            Int           @id @default(autoincrement())
+  ordenCompraId Int           @map("orden_compra_id")
+  ordenCompra   OrdenCompra   @relation(fields: [ordenCompraId], references: [id], onDelete: Restrict)
+  usuarioId     Int           @map("usuario_id")
+  usuario       Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  notas         String?
+  fecha         DateTime      @default(now())
+  motocicletas  Motocicleta[]
+
+  @@index([ordenCompraId])
+  @@map("recepciones")
 }
