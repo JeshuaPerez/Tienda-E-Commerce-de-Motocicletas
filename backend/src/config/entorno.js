@@ -1,4 +1,5 @@
 // Lee y valida las variables de entorno (RN 7). Ningún secreto vive en el código.
+import { fileURLToPath } from 'node:url';
 
 export class ErrorConfiguracion extends Error {
   constructor(problemas) {
@@ -39,6 +40,9 @@ export function cargarEntorno(variables = process.env) {
     JWT_SECRET: variables.JWT_SECRET,
     JWT_EXPIRA: variables.JWT_EXPIRA,
     BCRYPT_COSTO: costo,
+    // PA-8: carpeta local de comprobantes (fuera de git). Por defecto, backend/uploads/comprobantes.
+    DIRECTORIO_COMPROBANTES:
+      variables.DIRECTORIO_COMPROBANTES?.trim() || fileURLToPath(new URL('../../uploads/comprobantes', import.meta.url)),
   });
 }
 

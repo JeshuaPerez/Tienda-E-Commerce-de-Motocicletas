@@ -24,10 +24,21 @@ import { crearRutasInventario } from './modulos/inventario/inventario.rutas.js';
 import { crearServicioCompras } from './modulos/compras/compras.servicio.js';
 import { crearControladorCompras } from './modulos/compras/compras.controlador.js';
 import { crearRutasCompras } from './modulos/compras/compras.rutas.js';
+import { crearAlmacenArchivos } from './infra/almacen-archivos.js';
+import { crearServicioCupones } from './modulos/cupones/cupones.servicio.js';
+import { crearControladorCupones, crearRutasCupones } from './modulos/cupones/cupones.rutas.js';
+import { crearServicioCaja } from './modulos/caja/caja.servicio.js';
+import { crearControladorCaja, crearRutasCaja } from './modulos/caja/caja.rutas.js';
+import { crearServicioVentas } from './modulos/ventas/ventas.servicio.js';
+import { crearControladorVentas } from './modulos/ventas/ventas.controlador.js';
+import { crearRutasVentas } from './modulos/ventas/ventas.rutas.js';
+import { crearServicioPos } from './modulos/pos/pos.servicio.js';
+import { crearControladorPos, crearRutasPos } from './modulos/pos/pos.rutas.js';
 
-export function crearApp({ entorno = obtenerEntorno(), repositorioUsuarios, datos } = {}) {
+export function crearApp({ entorno = obtenerEntorno(), repositorioUsuarios, datos, almacen, reloj } = {}) {
   const repoUsuarios = repositorioUsuarios ?? crearRepositorioUsuarios(obtenerPrisma());
   const datosNegocio = datos ?? crearDatos(obtenerPrisma());
+  const almacenComprobantes = almacen ?? crearAlmacenArchivos(entorno.DIRECTORIO_COMPROBANTES);
   const contrasenas = crearServicioContrasenas(entorno.BCRYPT_COSTO);
   const tokens = crearServicioTokens({ secreto: entorno.JWT_SECRET, expira: entorno.JWT_EXPIRA });
   const autenticar = crearAutenticar({ tokens, repositorioUsuarios: repoUsuarios });
@@ -37,6 +48,10 @@ export function crearApp({ entorno = obtenerEntorno(), repositorioUsuarios, dato
   const servicioCatalogo = crearServicioCatalogo({ datos: datosNegocio });
   const servicioInventario = crearServicioInventario({ datos: datosNegocio });
   const servicioCompras = crearServicioCompras({ datos: datosNegocio });
+  const servicioCupones = crearServicioCupones({ datos: datosNegocio });
+  const servicioCaja = crearServicioCaja({ datos: datosNegocio, reloj });
+  const servicioVentas = crearServicioVentas({ datos: datosNegocio, almacen: almacenComprobantes, reloj });
+  const servicioPos = crearServicioPos({ datos: datosNegocio, reloj });
 
   const app = express();
   app.disable('x-powered-by');
@@ -50,6 +65,10 @@ export function crearApp({ entorno = obtenerEntorno(), repositorioUsuarios, dato
     crearRutasInventario({ controlador: crearControladorInventario({ servicioInventario, servicioCatalogo }), autenticar }),
   );
   app.use('/api', crearRutasCompras({ controlador: crearControladorCompras(servicioCompras), autenticar }));
+  app.use('/api/cupones', crearRutasCupones({ controlador: crearControladorCupones(servicioCupones), autenticar }));
+  app.use('/api/caja', crearRutasCaja({ controlador: crearControladorCaja(servicioCaja), autenticar }));
+  app.use('/api/pos', crearRutasPos({ controlador: crearControladorPos(servicioPos), autenticar }));
+  app.use('/api', crearRutasVentas({ controlador: crearControladorVentas(servicioVentas), autenticar }));
 
   app.use(rutaNoEncontrada);
   app.use(manejarErrores);
