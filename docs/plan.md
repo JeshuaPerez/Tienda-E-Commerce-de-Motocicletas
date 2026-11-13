@@ -89,9 +89,12 @@ Decisiones:
 | PA-12 Cupones | Cada cupón indica su canal: WEB, POS o AMBOS. | 2026-11-13 |
 | PA-7 Facturación | Factura interna (no FEL) con NIT o CF, nombre, dirección, serie y correlativo propios. Se emite sola cuando la venta queda pagada. La emisión está aislada en `backend/src/modulos/facturacion/emisor-interno.js` para conectar un certificador FEL más adelante; no se integra la SAT. | 2026-11-13 |
 | RF 10 Rendimiento | Margen bruto = ingresos sin IVA − costo de adquisición de las motos vendidas, por período. No incluye gastos operativos. | 2026-11-13 |
+| PA-10 Carrito sin sesión | El carrito vive en el navegador (localStorage); el catálogo y el carrito no exigen sesión. Al pagar se pide iniciar sesión de cliente y el servidor revalida precios, disponibilidad y cupón. | 2026-11-13 |
 
 Otras decisiones de la fase 2: el VIN sigue ISO 3779 (17 caracteres, sin I, O ni Q) y no se puede editar; el estado VENDIDA solo lo asigna una venta; los ajustes manuales son solo de accesorios, porque las motos salen del inventario con una venta.
 
 Otras decisiones de la fase 3: la transferencia aprobada entra como ingreso a la caja del día, por eso aprobarla exige la caja abierta; la caja del día es el día calendario de Guatemala y una caja olvidada abierta de un día anterior solo sirve para cerrarla; cada venta tiene un solo método de pago; el POS reutiliza la ficha del cliente si su NIT ya existe.
 
 Otras decisiones de la fase 4: para corregir datos fiscales se anula la factura y se reemite con número nuevo (nunca se edita una emitida); los reportes cuentan solo ventas cobradas según su fecha de pago; los accesorios no guardan costo unitario, así que en el rendimiento cuentan solo como ingreso.
+
+Otras decisiones de la fase 5: SPA con Vue 3, Vite y Tailwind sin librería de estado (la sesión y el carrito son módulos reactivos); en desarrollo Vite reenvía /api al backend, así que no hace falta CORS; los montos se muestran con aritmética de centavos enteros; el modelo de datos no tiene fotos, por eso las fichas usan la marca y la cilindrada como identidad visual.
