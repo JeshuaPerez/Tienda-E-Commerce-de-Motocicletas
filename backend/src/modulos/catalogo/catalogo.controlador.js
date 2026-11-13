@@ -1,5 +1,6 @@
 // Traduce HTTP ↔ servicio de catálogo (RF 02, PA-1). Sin reglas de negocio.
 import { leerId } from '../../utils/validacion.js';
+import { datosInvalidos } from '../../utils/errores.js';
 
 export function crearControladorCatalogo(servicio) {
   return {
@@ -12,6 +13,23 @@ export function crearControladorCatalogo(servicio) {
     crearModelo: async (req, res) => res.status(201).json({ modelo: await servicio.crearModelo(req.body) }),
     actualizarModelo: async (req, res) =>
       res.json({ modelo: await servicio.actualizarModelo(leerId(req.params.id), req.body) }),
+
+    async subirImagenModelo(req, res) {
+      if (!req.file) throw datosInvalidos(['imagen: adjunte el archivo en el campo "imagen"']);
+      res.json({ modelo: await servicio.subirImagenModelo(leerId(req.params.id), { contenido: req.file.buffer }) });
+    },
+    quitarImagenModelo: async (req, res) => res.json({ modelo: await servicio.quitarImagenModelo(leerId(req.params.id)) }),
+
+    // Se sirve con su tipo real, "nosniff" y una política que impide ejecutar scripts dentro del archivo.
+    async servirImagen(req, res) {
+      const { contenido, tipo } = await servicio.leerImagen(req.params.nombre);
+      res.set({
+        'Content-Type': tipo,
+        'Cache-Control': 'public, max-age=86400',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      }).send(contenido);
+    },
 
     listarCatalogo: async (req, res) => res.json(await servicio.listarCatalogo(req.query)),
     obtenerMotocicleta: async (req, res) =>

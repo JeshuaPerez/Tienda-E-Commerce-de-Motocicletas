@@ -40,17 +40,19 @@ import { crearControladorFacturacion, crearRutasFacturacion } from './modulos/fa
 import { crearServicioReportes } from './modulos/reportes/reportes.servicio.js';
 import { crearControladorReportes, crearRutasReportes } from './modulos/reportes/reportes.rutas.js';
 
-export function crearApp({ entorno = obtenerEntorno(), repositorioUsuarios, datos, almacen, reloj } = {}) {
+export function crearApp({ entorno = obtenerEntorno(), repositorioUsuarios, datos, almacen, almacenImagenes, reloj } = {}) {
   const repoUsuarios = repositorioUsuarios ?? crearRepositorioUsuarios(obtenerPrisma());
   const datosNegocio = datos ?? crearDatos(obtenerPrisma());
   const almacenComprobantes = almacen ?? crearAlmacenArchivos(entorno.DIRECTORIO_COMPROBANTES);
+  // Imágenes de modelos: se suben JPG, PNG o WebP; svg solo para ilustraciones cargadas por el servidor.
+  const imagenes = almacenImagenes ?? crearAlmacenArchivos(entorno.DIRECTORIO_IMAGENES, ['jpg', 'png', 'webp', 'svg']);
   const contrasenas = crearServicioContrasenas(entorno.BCRYPT_COSTO);
   const tokens = crearServicioTokens({ secreto: entorno.JWT_SECRET, expira: entorno.JWT_EXPIRA });
   const autenticar = crearAutenticar({ tokens, repositorioUsuarios: repoUsuarios });
 
   const servicioAuth = crearServicioAuth({ repositorioUsuarios: repoUsuarios, contrasenas, tokens });
   const servicioUsuarios = crearServicioUsuarios({ repositorioUsuarios: repoUsuarios, contrasenas });
-  const servicioCatalogo = crearServicioCatalogo({ datos: datosNegocio });
+  const servicioCatalogo = crearServicioCatalogo({ datos: datosNegocio, almacenImagenes: imagenes });
   const servicioInventario = crearServicioInventario({ datos: datosNegocio });
   const servicioCompras = crearServicioCompras({ datos: datosNegocio });
   const servicioCupones = crearServicioCupones({ datos: datosNegocio });

@@ -91,7 +91,7 @@ export function crearServicioVentas({ datos, almacen, reloj = () => new Date(), 
 
     // PA-8: solo JPG, PNG o PDF (por su firma real) y hasta 5 MB.
     async subirComprobante(ventaId, archivo, usuario) {
-      const tipo = detectarTipoArchivo(archivo?.contenido);
+      const tipo = detectarTipoArchivo(archivo?.contenido, COMPROBANTES.tipos);
       if (!tipo) throw datosInvalidos(['comprobante: solo se aceptan archivos JPG, PNG o PDF']);
       if (archivo.contenido.length > COMPROBANTES.tamanoMaximo) {
         throw datosInvalidos(['comprobante: el archivo supera 5 MB']);

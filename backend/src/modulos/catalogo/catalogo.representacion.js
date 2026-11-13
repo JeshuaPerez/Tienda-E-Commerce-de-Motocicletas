@@ -9,6 +9,7 @@ export const modeloPublico = (m) =>
     nombre: m.nombre,
     cilindrada: m.cilindrada,
     stockMinimo: m.stockMinimo,
+    imagenUrl: m.imagen ? `/api/imagenes/${m.imagen}` : null,
     marca: marcaPublica(m.marca),
   };
 

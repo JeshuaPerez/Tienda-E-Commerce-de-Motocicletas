@@ -51,6 +51,18 @@ function guardarEdicion() {
   return tras(promesa, 'Cambios guardados.', () => { edicion.value = null; });
 }
 
+// Imagen del modelo (ampliación): JPG, PNG o WebP de hasta 2 MB; el servidor valida el tipo real.
+const TIPOS_IMAGEN = ['image/jpeg', 'image/png', 'image/webp'];
+function subirImagen(m, evento) {
+  const archivo = evento.target.files?.[0];
+  evento.target.value = '';
+  if (!archivo) return;
+  if (!TIPOS_IMAGEN.includes(archivo.type)) { error.value = { message: 'Solo se aceptan imágenes JPG, PNG o WebP.' }; return; }
+  if (archivo.size > 2 * 1024 * 1024) { error.value = { message: 'La imagen supera 2 MB.' }; return; }
+  return tras(() => panel.subirImagenModelo(m.id, archivo), `Imagen de ${m.marca.nombre} ${m.nombre} actualizada.`);
+}
+const quitarImagen = (m) => tras(() => panel.quitarImagenModelo(m.id), `Imagen de ${m.marca.nombre} ${m.nombre} quitada.`);
+
 onMounted(() => ejecutar(cargar));
 </script>
 
@@ -87,8 +99,15 @@ onMounted(() => ejecutar(cargar));
     <section class="tarjeta p-5 xl:col-span-2">
       <h2 class="mb-3 font-bold">Modelos</h2>
       <ul class="mb-4 divide-y divide-zinc-100 text-sm">
-        <li v-for="m in modelos" :key="m.id" class="flex items-center justify-between py-2">
-          <span>{{ m.marca.nombre }} {{ m.nombre }} · {{ m.cilindrada }} cc · mínimo {{ m.stockMinimo }}</span>
+        <li v-for="m in modelos" :key="m.id" class="flex flex-wrap items-center gap-3 py-2">
+          <img v-if="m.imagenUrl" :src="m.imagenUrl" :alt="`${m.marca.nombre} ${m.nombre}`" class="h-12 w-20 rounded-md bg-zinc-100 object-contain" />
+          <span v-else class="grid h-12 w-20 place-items-center rounded-md bg-zinc-100 text-xs text-zinc-400">Sin foto</span>
+          <span class="flex-1">{{ m.marca.nombre }} {{ m.nombre }} · {{ m.cilindrada }} cc · mínimo {{ m.stockMinimo }}</span>
+          <label class="boton-texto cursor-pointer">
+            {{ m.imagenUrl ? 'Cambiar foto' : 'Subir foto' }}
+            <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="subirImagen(m, $event)" />
+          </label>
+          <button v-if="m.imagenUrl" type="button" class="boton-texto" @click="quitarImagen(m)">Quitar foto</button>
           <button type="button" class="boton-texto" @click="editarModelo(m)">Editar</button>
         </li>
       </ul>
