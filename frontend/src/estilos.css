@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+/* Identidad visual: sobria y moderna, fondo claro y un acento rojo. */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-acento-50: oklch(0.97 0.02 25);
+  --color-acento-100: oklch(0.94 0.04 25);
+  --color-acento-500: oklch(0.6 0.21 27);
+  --color-acento-600: oklch(0.54 0.21 27);
+  --color-acento-700: oklch(0.46 0.18 27);
+}
+
+@layer base {
+  body {
+    @apply bg-zinc-50 text-zinc-900 antialiased;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-acento-600;
+  }
+}
+
+/* En Tailwind 4 las clases propias que se reutilizan con @apply se declaran con @utility. */
+@utility boton {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility boton-principal {
+  @apply boton bg-acento-600 text-white hover:bg-acento-700;
+}
+@utility boton-secundario {
+  @apply boton border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100;
+}
+@utility boton-texto {
+  @apply boton px-2 text-zinc-600 hover:text-acento-700;
+}
+@utility campo {
+  @apply w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm shadow-xs focus:border-acento-500 focus:ring-2 focus:ring-acento-100 focus:outline-none;
+}
+@utility etiqueta {
+  @apply mb-1 block text-sm font-medium text-zinc-700;
+}
+@utility tarjeta {
+  @apply rounded-2xl border border-zinc-200 bg-white shadow-xs;
+}
+
+@media print {
+  .no-imprimir {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}
