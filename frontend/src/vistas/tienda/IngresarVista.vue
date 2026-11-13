@@ -19,8 +19,9 @@ async function ingresar() {
   enviando.value = true;
   error.value = null;
   try {
-    await iniciarSesion(correo.value, contrasena.value);
-    router.replace(destino());
+    const usuario = await iniciarSesion(correo.value, contrasena.value);
+    const sinDestino = destino() === '/';
+    router.replace(usuario.rol === 'ADMINISTRADOR' && sinDestino ? '/panel' : destino());
   } catch (e) {
     error.value = e;
   } finally {

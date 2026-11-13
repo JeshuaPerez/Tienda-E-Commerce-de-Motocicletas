@@ -172,7 +172,9 @@ export function crearRepositorios(db) {
     },
 
     ventas: {
-      crear: ({ detalles, ...datos }) => db.venta.create({ data: { ...datos, detalles: { create: detalles } } }),
+      // Devuelve la venta completa (con sus líneas), igual que buscarPorId: el POS la usa enseguida.
+      crear: ({ detalles, ...datos }) =>
+        db.venta.create({ data: { ...datos, detalles: { create: detalles } }, include: ventaCompleta }),
       buscarPorId: (id) => db.venta.findUnique({ where: { id }, include: ventaCompleta }),
       bloquear: (id) => db.$queryRaw`SELECT id FROM "ventas" WHERE id = ${id} FOR UPDATE`,
       actualizar: (id, datos) => db.venta.update({ where: { id }, data: datos }),

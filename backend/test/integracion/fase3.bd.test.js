@@ -68,7 +68,20 @@ describe('Fase 3 · integración con PostgreSQL', { skip: !hayBaseDePruebas && '
       s.pos.registrarVenta({ cliente: { nombre: 'Mostrador' }, items: [{ motocicletaId: moto.id }], pago: { metodo: 'EFECTIVO' } }, adminId),
     ]);
     assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
+    // La que pierde debe fallar por la regla de negocio (409), no por un error inesperado.
+    assert.equal(resultados.find((r) => r.status === 'rejected').reason.estado, 409);
     assert.equal(await prisma.venta.count(), 1);
+  });
+
+  it('RF 04: una venta del POS con base real deja la moto vendida, su salida y el ingreso en caja', async () => {
+    await s.caja.abrir({ montoInicial: '0' }, adminId);
+    const venta = await s.pos.registrarVenta(
+      { cliente: { nombre: 'Mostrador' }, items: [{ motocicletaId: moto.id }], pago: { metodo: 'EFECTIVO' } }, adminId,
+    );
+    assert.equal(venta.estado, 'PAGADA');
+    assert.equal((await prisma.motocicleta.findUnique({ where: { id: moto.id } })).estado, 'VENDIDA');
+    assert.equal(await prisma.movimientoInventario.count({ where: { motocicletaId: moto.id, motivo: 'VENTA_POS' } }), 1);
+    assert.equal(await prisma.movimientoCaja.count({ where: { ventaId: venta.id, tipo: 'INGRESO' } }), 1);
   });
 
   it('RF 05: el índice parcial impide dos cajas abiertas aunque se abran a la vez', async () => {
