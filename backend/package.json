@@ -1,0 +1,32 @@
+{
+  "name": "motostore-gt-backend",
+  "version": "0.1.0",
+  "description": "API REST de MotoStore GT",
+  "author": "JeshuaPerez",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "bcrypt": "6.0.0",
+    "express": "5.3.0",
+    "jsonwebtoken": "9.0.3"
+  },
+  "devDependencies": {
+    "prisma": "7.10.1"
+  },
+  "scripts": {
+    "dev": "node --watch src/servidor.js",
+    "start": "node src/servidor.js",
+    "prisma:generar": "prisma generate",
+    "db:migrar": "prisma migrate dev",
+    "db:desplegar": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "pretest": "node scripts/migrar-test.js",
+    "test": "node --import ./test/preparar-entorno.js --test --test-concurrency=1 \"test/**/*.test.js\""
+  }
+}
