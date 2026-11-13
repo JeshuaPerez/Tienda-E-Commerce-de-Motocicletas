@@ -32,6 +32,7 @@ model Usuario {
   cajasCerradas         SesionCaja[]               @relation("CajaCerradaPor")
   movimientosCaja       MovimientoCaja[]
   comprobantesRevisados ComprobanteTransferencia[]
+  facturasAnuladas      Factura[]
 
   @@map("usuarios")
 }
@@ -350,6 +351,7 @@ model Venta {
   entregadaEn      DateTime?                  @map("entregada_en")
   detalles         VentaDetalle[]
   comprobantes     ComprobanteTransferencia[]
+  facturas         Factura[]
   movimientosCaja  MovimientoCaja[]
 
   @@index([estado])
@@ -441,4 +443,63 @@ model MovimientoCaja {
   @@index([sesionCajaId])
   @@index([fecha])
   @@map("movimientos_caja")
+}
+
+// ───────────── Fase 4: facturación (RF 08) ─────────────
+
+enum EstadoFactura {
+  EMITIDA
+  ANULADA
+}
+
+// Correlativo por serie. Se incrementa con un solo UPDATE atómico dentro de la transacción de la venta.
+model SerieFactura {
+  serie        String @id @db.VarChar(10)
+  ultimoNumero Int    @default(0) @map("ultimo_numero")
+
+  @@map("series_factura")
+}
+
+// Factura interna (PA-7): no es FEL. Guarda una copia fija de los datos fiscales y de los montos al emitirse.
+// Una venta puede tener facturas anuladas, pero solo una EMITIDA (índice único parcial en la migración).
+model Factura {
+  id              Int            @id @default(autoincrement())
+  serie           String         @db.VarChar(10)
+  numero          Int
+  ventaId         Int            @map("venta_id")
+  venta           Venta          @relation(fields: [ventaId], references: [id], onDelete: Restrict)
+  nit             String         @db.VarChar(20)
+  nombre          String         @db.VarChar(150)
+  direccion       String         @db.VarChar(250)
+  subtotal        Decimal        @db.Decimal(12, 2)
+  descuento       Decimal        @db.Decimal(12, 2)
+  total           Decimal        @db.Decimal(12, 2)
+  baseImponible   Decimal        @map("base_imponible") @db.Decimal(12, 2)
+  iva             Decimal        @db.Decimal(12, 2)
+  estado          EstadoFactura  @default(EMITIDA)
+  emitidaEn       DateTime       @default(now()) @map("emitida_en")
+  anuladaEn       DateTime?      @map("anulada_en")
+  anuladaPorId    Int?           @map("anulada_por_id")
+  anuladaPor      Usuario?       @relation(fields: [anuladaPorId], references: [id], onDelete: Restrict)
+  motivoAnulacion String?        @map("motivo_anulacion") @db.VarChar(300)
+  lineas          FacturaLinea[]
+
+  @@unique([serie, numero])
+  @@index([nit])
+  @@index([ventaId])
+  @@index([emitidaEn])
+  @@map("facturas")
+}
+
+model FacturaLinea {
+  id             Int     @id @default(autoincrement())
+  facturaId      Int     @map("factura_id")
+  factura        Factura @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  descripcion    String  @db.VarChar(200)
+  cantidad       Int
+  precioUnitario Decimal @map("precio_unitario") @db.Decimal(12, 2)
+  subtotal       Decimal @db.Decimal(12, 2)
+
+  @@index([facturaId])
+  @@map("facturas_lineas")
 }
