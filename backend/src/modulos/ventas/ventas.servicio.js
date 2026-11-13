@@ -5,6 +5,8 @@ import { conflicto, datosInvalidos, noEncontrado } from '../../utils/errores.js'
 import { detectarTipoArchivo } from '../../utils/archivos.js';
 import { crearLector, leerPaginacion, sinIndefinidos } from '../../utils/validacion.js';
 import { exigirCajaDelDia } from '../caja/caja.servicio.js';
+import { crearEmisorInterno } from '../facturacion/emisor-interno.js';
+import { facturarVenta } from '../facturacion/facturacion.servicio.js';
 import {
   METODOS_MOSTRADOR, METODOS_WEB, buscarVentaVisible, datosVenta, descontarAccesorios, leerFacturacion, leerItems,
   leerPago, liberarVenta, obtenerCupon, prepararLineas, registrarIngresoCaja, totalesDe, venderMotos, ventaPublica,
@@ -26,7 +28,7 @@ const comprobantePublico = (c) => ({
   venta: c.venta ? { id: c.venta.id, total: ventaPublica(c.venta).total, cliente: ventaPublica(c.venta).cliente } : undefined,
 });
 
-export function crearServicioVentas({ datos, almacen, reloj = () => new Date() }) {
+export function crearServicioVentas({ datos, almacen, reloj = () => new Date(), emisor = crearEmisorInterno() }) {
   const { repos } = datos;
 
   // Comprobante pendiente → la venta debe estar en validación. Devuelve ambos, con la venta bloqueada.
@@ -126,6 +128,7 @@ export function crearServicioVentas({ datos, almacen, reloj = () => new Date() }
         await venderMotos(r, venta, 'VENTA_WEB', adminId);
         await r.ventas.actualizar(venta.id, { estado: 'PAGADA', pagadaEn: reloj(), sesionCajaId: caja.id });
         await registrarIngresoCaja(r, caja, venta, 'TRANSFERENCIA', `Comprobante #${comprobante.id}`, adminId);
+        await facturarVenta(r, emisor, venta.id, reloj()); // RF 08: factura automática al quedar pagada
         return ventaPublica(await r.ventas.buscarPorId(venta.id));
       }),
 
@@ -157,6 +160,7 @@ export function crearServicioVentas({ datos, almacen, reloj = () => new Date() }
           estado: 'PAGADA', pagadaEn: reloj(), vendedorId: adminId, sesionCajaId: caja.id, referenciaPago: pago.referencia ?? null,
         });
         await registrarIngresoCaja(r, caja, venta, pago.metodo, pago.referencia, adminId);
+        await facturarVenta(r, emisor, ventaId, reloj()); // RF 08
         return ventaPublica(await r.ventas.buscarPorId(ventaId));
       });
     },

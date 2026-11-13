@@ -12,6 +12,7 @@ export function crearBaseFalsa() {
     marcas: [], modelos: [], motocicletas: [], accesorios: [], movimientos: [],
     proveedores: [], ordenes: [], detalles: [], recepciones: [],
     clientes: [], cupones: [], ventas: [], ventasDetalle: [], comprobantes: [], cajas: [], movimientosCaja: [],
+    facturas: [], facturasLineas: [], series: [],
   };
   const contadores = {};
   const nuevoId = (tabla) => (contadores[tabla] = (contadores[tabla] ?? 0) + 1);
@@ -61,6 +62,13 @@ export function crearBaseFalsa() {
           accesorio: d.accesorioId ? porId('accesorios', d.accesorioId) : null,
         })),
       comprobantes: tablas.comprobantes.filter((c) => c.ventaId === v.id).map((c) => ({ ...c })),
+      facturas: tablas.facturas.filter((f) => f.ventaId === v.id).map((f) => ({ ...f })),
+    };
+  const facturaCompleta = (f) =>
+    f && {
+      ...f,
+      lineas: tablas.facturasLineas.filter((l) => l.facturaId === f.id).map((l) => ({ ...l })),
+      venta: { ...porId('ventas', f.ventaId), cliente: porId('clientes', porId('ventas', f.ventaId).clienteId) },
     };
 
   const repos = {
@@ -239,6 +247,48 @@ export function crearBaseFalsa() {
           .reverse();
         return paginar(filas, saltar, tomar);
       },
+      // Ventas cobradas (PAGADA o ENTREGADA) cuyo pago cae entre dos instantes.
+      listarCobradas: async ({ desde, hasta }) =>
+        tablas.ventas
+          .filter((v) => ['PAGADA', 'ENTREGADA'].includes(v.estado) && v.pagadaEn >= desde && v.pagadaEn <= hasta)
+          .map(ventaCompleta),
+    },
+
+    facturas: {
+      siguienteNumero: async (serie) => {
+        let fila = tablas.series.find((s) => s.serie === serie);
+        if (!fila) tablas.series.push((fila = { serie, ultimoNumero: 0 }));
+        fila.ultimoNumero += 1;
+        return fila.ultimoNumero;
+      },
+      crear: async ({ lineas, ...datos }) => {
+        if (datos.estado !== 'ANULADA' && tablas.facturas.some((f) => f.ventaId === datos.ventaId && f.estado === 'EMITIDA')) {
+          throw conflicto('La venta ya tiene una factura emitida');
+        }
+        const factura = insertar('facturas', { estado: 'EMITIDA', anuladaEn: null, motivoAnulacion: null, anuladaPorId: null, ...datos });
+        for (const l of lineas) insertar('facturasLineas', { facturaId: factura.id, ...l });
+        return facturaCompleta(porId('facturas', factura.id));
+      },
+      buscarPorId: async (id) => facturaCompleta(porId('facturas', id)),
+      bloquear: async () => {},
+      actualizar: async (id, datos) => actualizar('facturas', id, datos),
+      listar: async ({ filtros = {}, saltar = 0, tomar = 20 } = {}) => {
+        const f = filtros;
+        const filas = tablas.facturas
+          .filter((x) => {
+            const venta = porId('ventas', x.ventaId);
+            return (
+              (!f.nit || x.nit === f.nit) &&
+              (!f.estado || x.estado === f.estado) &&
+              (!f.clienteId || venta.clienteId === f.clienteId) &&
+              (!f.desde || x.emitidaEn >= f.desde) &&
+              (!f.hasta || x.emitidaEn <= f.hasta)
+            );
+          })
+          .map(facturaCompleta)
+          .reverse();
+        return paginar(filas, saltar, tomar);
+      },
     },
 
     comprobantes: {
@@ -267,6 +317,11 @@ export function crearBaseFalsa() {
       listar: async () => tablas.cajas.map((c) => ({ ...c })).reverse(),
       registrarMovimiento: async (datos) => insertar('movimientosCaja', { fecha: new Date(), ventaId: null, referencia: null, ...datos }),
       listarMovimientos: async (sesionCajaId) => tablas.movimientosCaja.filter((m) => m.sesionCajaId === sesionCajaId),
+      // Sesiones cuyo día de operación (AAAA-MM-DD) está en el rango, con sus movimientos.
+      listarSesionesEntre: async (desde, hasta) =>
+        tablas.cajas
+          .filter((c) => c.fechaOperacion >= desde && c.fechaOperacion <= hasta)
+          .map((c) => ({ ...c, movimientos: tablas.movimientosCaja.filter((m) => m.sesionCajaId === c.id) })),
       totalesPorMedio: async (sesionCajaId) => {
         const totales = new Map();
         for (const m of tablas.movimientosCaja.filter((x) => x.sesionCajaId === sesionCajaId)) {

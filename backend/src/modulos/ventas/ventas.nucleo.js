@@ -187,6 +187,10 @@ export const ventaPublica = (v) =>
     comprobantes: (v.comprobantes ?? []).map((c) => ({
       id: c.id, estado: c.estado, motivoRechazo: c.motivoRechazo ?? null, subidoEn: c.subidoEn, revisadoEn: c.revisadoEn ?? null,
     })),
+    // Estado de facturación (5.1): facturas emitidas o anuladas de la venta.
+    facturas: (v.facturas ?? []).map((f) => ({
+      id: f.id, serie: f.serie, numero: f.numero, numeroCompleto: `${f.serie}-${String(f.numero).padStart(8, '0')}`, estado: f.estado,
+    })),
   };
 
 // Datos de la venta para guardarla (montos como Decimal).
