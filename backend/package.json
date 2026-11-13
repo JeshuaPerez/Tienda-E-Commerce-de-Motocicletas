@@ -27,6 +27,7 @@
     "db:desplegar": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "pretest": "node scripts/migrar-test.js",
-    "test": "node --import ./test/preparar-entorno.js --test --test-concurrency=1 \"test/**/*.test.js\""
+    "test": "node --import ./test/preparar-entorno.js --test --test-concurrency=1 \"test/**/*.test.js\"",
+    "test:unit": "node --import ./test/preparar-entorno.js --test --test-concurrency=1 \"test/unit/**/*.test.js\""
   }
 }

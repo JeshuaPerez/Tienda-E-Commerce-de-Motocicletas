@@ -15,18 +15,23 @@ enum Rol {
 
 // Cuenta de acceso (RF 01). El correo es único y está indexado.
 model Usuario {
-  id             Int                    @id @default(autoincrement())
-  correo         String                 @unique @db.VarChar(150)
-  hashContrasena String                 @map("hash_contrasena") @db.VarChar(100)
-  nombre         String                 @db.VarChar(120)
-  rol            Rol                    @default(CLIENTE)
-  activo         Boolean                @default(true)
-  creadoEn       DateTime               @default(now()) @map("creado_en")
-  actualizadoEn  DateTime               @updatedAt @map("actualizado_en")
-  cliente        Cliente?
-  movimientos    MovimientoInventario[]
-  ordenesCompra  OrdenCompra[]
-  recepciones    Recepcion[]
+  id                    Int                        @id @default(autoincrement())
+  correo                String                     @unique @db.VarChar(150)
+  hashContrasena        String                     @map("hash_contrasena") @db.VarChar(100)
+  nombre                String                     @db.VarChar(120)
+  rol                   Rol                        @default(CLIENTE)
+  activo                Boolean                    @default(true)
+  creadoEn              DateTime                   @default(now()) @map("creado_en")
+  actualizadoEn         DateTime                   @updatedAt @map("actualizado_en")
+  cliente               Cliente?
+  movimientos           MovimientoInventario[]
+  ordenesCompra         OrdenCompra[]
+  recepciones           Recepcion[]
+  ventasComoVendedor    Venta[]                    @relation("VendedorVenta")
+  cajasAbiertas         SesionCaja[]               @relation("CajaAbiertaPor")
+  cajasCerradas         SesionCaja[]               @relation("CajaCerradaPor")
+  movimientosCaja       MovimientoCaja[]
+  comprobantesRevisados ComprobanteTransferencia[]
 
   @@map("usuarios")
 }
@@ -41,6 +46,7 @@ model Cliente {
   usuarioId Int?     @unique @map("usuario_id")
   usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
   creadoEn  DateTime @default(now()) @map("creado_en")
+  ventas    Venta[]
 
   @@index([nit])
   @@map("clientes")
@@ -63,6 +69,9 @@ enum MotivoMovimiento {
   COMPRA
   ALTA_MANUAL
   AJUSTE
+  VENTA_WEB
+  VENTA_POS
+  LIBERACION
 }
 
 enum TipoProveedor {
@@ -122,6 +131,7 @@ model Motocicleta {
   creadoEn         DateTime               @default(now()) @map("creado_en")
   actualizadoEn    DateTime               @updatedAt @map("actualizado_en")
   movimientos      MovimientoInventario[]
+  lineasVenta      VentaDetalle[]
 
   @@index([estado])
   @@index([precio])
@@ -143,6 +153,7 @@ model Accesorio {
   actualizadoEn DateTime               @updatedAt @map("actualizado_en")
   movimientos   MovimientoInventario[]
   detallesOrden OrdenCompraDetalle[]
+  lineasVenta   VentaDetalle[]
 
   @@map("accesorios")
 }
@@ -234,4 +245,200 @@ model Recepcion {
 
   @@index([ordenCompraId])
   @@map("recepciones")
+}
+
+// ───────────── Fase 3: ventas, cupones y caja (RF 03, RF 04, RF 05, RF 09) ─────────────
+
+enum CanalVenta {
+  WEB
+  POS
+}
+
+// PENDIENTE_PAGO → (comprobante) PENDIENTE_VALIDACION → PAGADA → ENTREGADA. RECHAZADA y CANCELADA liberan las unidades.
+enum EstadoVenta {
+  PENDIENTE_PAGO
+  PENDIENTE_VALIDACION
+  PAGADA
+  ENTREGADA
+  RECHAZADA
+  CANCELADA
+}
+
+// TRANSFERENCIA y POS_AL_RETIRAR son de la tienda web; EFECTIVO, TARJETA y TRANSFERENCIA, del mostrador (PA-5).
+enum MetodoPago {
+  TRANSFERENCIA
+  POS_AL_RETIRAR
+  EFECTIVO
+  TARJETA
+}
+
+enum TipoCupon {
+  PORCENTAJE
+  MONTO_FIJO
+}
+
+enum CanalCupon {
+  WEB
+  POS
+  AMBOS
+}
+
+enum EstadoComprobante {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+enum EstadoCaja {
+  ABIERTA
+  CERRADA
+}
+
+enum TipoMovimientoCaja {
+  INGRESO
+  RETIRO
+}
+
+enum MedioCaja {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+}
+
+model Cupon {
+  id           Int        @id @default(autoincrement())
+  codigo       String     @unique @db.VarChar(40)
+  tipo         TipoCupon
+  valor        Decimal    @db.Decimal(12, 2)
+  vigenteDesde DateTime   @map("vigente_desde")
+  vigenteHasta DateTime   @map("vigente_hasta")
+  usosMaximos  Int?       @map("usos_maximos")
+  usosActuales Int        @default(0) @map("usos_actuales")
+  canal        CanalCupon @default(AMBOS)
+  activo       Boolean    @default(true)
+  creadoEn     DateTime   @default(now()) @map("creado_en")
+  ventas       Venta[]
+
+  @@map("cupones")
+}
+
+// Venta única para web y mostrador (canal). Montos en GTQ; el IVA va incluido en el total (PA-6).
+model Venta {
+  id               Int                        @id @default(autoincrement())
+  canal            CanalVenta
+  estado           EstadoVenta
+  metodoPago       MetodoPago                 @map("metodo_pago")
+  referenciaPago   String?                    @map("referencia_pago") @db.VarChar(100)
+  clienteId        Int                        @map("cliente_id")
+  cliente          Cliente                    @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  vendedorId       Int?                       @map("vendedor_id")
+  vendedor         Usuario?                   @relation("VendedorVenta", fields: [vendedorId], references: [id], onDelete: Restrict)
+  cuponId          Int?                       @map("cupon_id")
+  cupon            Cupon?                     @relation(fields: [cuponId], references: [id], onDelete: Restrict)
+  sesionCajaId     Int?                       @map("sesion_caja_id")
+  sesionCaja       SesionCaja?                @relation(fields: [sesionCajaId], references: [id], onDelete: Restrict)
+  subtotal         Decimal                    @db.Decimal(12, 2)
+  descuento        Decimal                    @default(0) @db.Decimal(12, 2)
+  total            Decimal                    @db.Decimal(12, 2)
+  iva              Decimal                    @db.Decimal(12, 2)
+  nitFactura       String                     @default("CF") @map("nit_factura") @db.VarChar(20)
+  nombreFactura    String                     @map("nombre_factura") @db.VarChar(150)
+  direccionFactura String                     @default("Ciudad") @map("direccion_factura") @db.VarChar(250)
+  creadaEn         DateTime                   @default(now()) @map("creada_en")
+  actualizadaEn    DateTime                   @updatedAt @map("actualizada_en")
+  pagadaEn         DateTime?                  @map("pagada_en")
+  entregadaEn      DateTime?                  @map("entregada_en")
+  detalles         VentaDetalle[]
+  comprobantes     ComprobanteTransferencia[]
+  movimientosCaja  MovimientoCaja[]
+
+  @@index([estado])
+  @@index([creadaEn])
+  @@index([clienteId])
+  @@index([nitFactura])
+  @@map("ventas")
+}
+
+// Cada línea es una moto (cantidad 1) o un accesorio, nunca ambos.
+model VentaDetalle {
+  id             Int          @id @default(autoincrement())
+  ventaId        Int          @map("venta_id")
+  venta          Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  motocicletaId  Int?         @map("motocicleta_id")
+  motocicleta    Motocicleta? @relation(fields: [motocicletaId], references: [id], onDelete: Restrict)
+  accesorioId    Int?         @map("accesorio_id")
+  accesorio      Accesorio?   @relation(fields: [accesorioId], references: [id], onDelete: Restrict)
+  descripcion    String       @db.VarChar(200)
+  cantidad       Int
+  precioUnitario Decimal      @map("precio_unitario") @db.Decimal(12, 2)
+  subtotal       Decimal      @db.Decimal(12, 2)
+
+  @@index([ventaId])
+  @@index([motocicletaId])
+  @@map("ventas_detalle")
+}
+
+// Comprobante de transferencia subido por el cliente (PA-8). El archivo vive fuera de git.
+model ComprobanteTransferencia {
+  id            Int               @id @default(autoincrement())
+  ventaId       Int               @map("venta_id")
+  venta         Venta             @relation(fields: [ventaId], references: [id], onDelete: Restrict)
+  rutaArchivo   String            @map("ruta_archivo") @db.VarChar(200)
+  tipoArchivo   String            @map("tipo_archivo") @db.VarChar(50)
+  tamano        Int
+  estado        EstadoComprobante @default(PENDIENTE)
+  motivoRechazo String?           @map("motivo_rechazo") @db.VarChar(300)
+  revisadoPorId Int?              @map("revisado_por_id")
+  revisadoPor   Usuario?          @relation(fields: [revisadoPorId], references: [id], onDelete: Restrict)
+  revisadoEn    DateTime?         @map("revisado_en")
+  subidoEn      DateTime          @default(now()) @map("subido_en")
+
+  @@index([estado])
+  @@index([ventaId])
+  @@map("comprobantes_transferencia")
+}
+
+// Caja diaria (RF 05). Solo puede haber una ABIERTA a la vez (índice único parcial en la migración).
+model SesionCaja {
+  id                  Int              @id @default(autoincrement())
+  estado              EstadoCaja       @default(ABIERTA)
+  abiertaPorId        Int              @map("abierta_por_id")
+  abiertaPor          Usuario          @relation("CajaAbiertaPor", fields: [abiertaPorId], references: [id], onDelete: Restrict)
+  abiertaEn           DateTime         @default(now()) @map("abierta_en")
+  fechaOperacion      String           @map("fecha_operacion") @db.VarChar(10)
+  montoInicial        Decimal          @map("monto_inicial") @db.Decimal(12, 2)
+  cerradaPorId        Int?             @map("cerrada_por_id")
+  cerradaPor          Usuario?         @relation("CajaCerradaPor", fields: [cerradaPorId], references: [id], onDelete: Restrict)
+  cerradaEn           DateTime?        @map("cerrada_en")
+  efectivoEsperado    Decimal?         @map("efectivo_esperado") @db.Decimal(12, 2)
+  efectivoContado     Decimal?         @map("efectivo_contado") @db.Decimal(12, 2)
+  vouchersEsperado    Decimal?         @map("vouchers_esperado") @db.Decimal(12, 2)
+  vouchersContado     Decimal?         @map("vouchers_contado") @db.Decimal(12, 2)
+  transferenciasTotal Decimal?         @map("transferencias_total") @db.Decimal(12, 2)
+  notasCierre         String?          @map("notas_cierre") @db.VarChar(500)
+  movimientos         MovimientoCaja[]
+  ventas              Venta[]
+
+  @@index([fechaOperacion])
+  @@map("sesiones_caja")
+}
+
+model MovimientoCaja {
+  id           Int                @id @default(autoincrement())
+  sesionCajaId Int                @map("sesion_caja_id")
+  sesionCaja   SesionCaja         @relation(fields: [sesionCajaId], references: [id], onDelete: Restrict)
+  tipo         TipoMovimientoCaja
+  medio        MedioCaja
+  monto        Decimal            @db.Decimal(12, 2)
+  concepto     String             @db.VarChar(200)
+  referencia   String?            @db.VarChar(100)
+  ventaId      Int?               @map("venta_id")
+  venta        Venta?             @relation(fields: [ventaId], references: [id], onDelete: Restrict)
+  usuarioId    Int                @map("usuario_id")
+  usuario      Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  fecha        DateTime           @default(now())
+
+  @@index([sesionCajaId])
+  @@index([fecha])
+  @@map("movimientos_caja")
 }
